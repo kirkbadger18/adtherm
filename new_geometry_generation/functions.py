@@ -20,7 +20,7 @@ def get_min_max_distance(self, pos):
 def calculate_rigid_hessian(self, displacement_list, force_list):
     f = force_list
     x = displacement_list
-    B = get_external_basis(self)
+    B = get_external_basis(self, self.atoms)
     f_sub = np.matmul(np.transpose(B), f)
     df_sub = np.zeros([self.ndim, self.ndim])
     dx = np.zeros([3 * len(self.indices), self.ndim])
@@ -35,9 +35,9 @@ def calculate_rigid_hessian(self, displacement_list, force_list):
             H_sym[i,j] = np.average([H[i,j], H[j,i]])
     return H_sym
 
-def get_external_basis(self):
-    ads = self.adsorbate.copy()
-    com = self.adsorbate_center_of_mass
+def get_external_basis(self, atoms):
+    ads = atoms[self.indices].copy()
+    com = ads.get_center_of_mass()
     pa = np.transpose(ads.get_moments_of_inertia(vectors=True)[1])
     B = np.zeros([3 * len(self.indices), self.ndim])
     ads_pos = ads.positions-com
@@ -54,18 +54,21 @@ def get_external_basis(self):
         B[:, i] *= 1 / LA.norm(np.copy(B[:, i]))
     return B
 
-def bootstrap_points(self, force, E, atoms, coord):
+def bootstrap_points(self, atoms, coord):
+    force_all = atoms.calc.results['forces']
+    force = force_all[self.indices].reshape(-1)
+    E = atoms.calc.results['energy']
     dx = 1e-2
-    B = self.get_external_basis(atoms)
+    B = get_external_basis(self, atoms)
     f_sub = -1 * np.matmul(np.transpose(B), force)
     dE = dx * f_sub
-    xi = np.zeros([2*self.ndim, 6])
+    x = np.zeros([2*self.ndim, 6])
     y = np.zeros(2 * self.ndim)
     for i in range(self.ndim):
-        xi[2 * i, :] = coord
-        xi[2 * i+1, :] = coord
-        xi[2 * i, i] -= 0.5 * dx
-        xi[2 * i+1, i] += 0.5 * dx
+        x[2 * i, :] = coord
+        x[2 * i+1, :] = coord
+        x[2 * i, i] -= 0.5 * dx
+        x[2 * i+1, i] += 0.5 * dx
         y[2 * i] = E - 0.5 * dE[i]
         y[2 * i+1] = E + 0.5 * dE[i]
-    return xi, y
+    return x, y

@@ -2,10 +2,8 @@ import numpy as np
 import numpy.linalg as LA
 from ase.io.trajectory import Trajectory
 from ase.optimize import BFGS
-from ase.constraints import FixExternals
-#from io import write_coord
-from .functions import *
-from new_geometry_generation.generate import coord_generate 
+from functions import *
+from generate import coord_generate 
 
 
 class AdTherm:
@@ -27,7 +25,7 @@ class AdTherm:
         self.uc_y = atoms.get_cell_lengths_and_angles()[1]
         self.adsorbate_center_of_mass = self.adsorbate.get_center_of_mass()
         self.min_cutoff = 0.2
-        self.max_cutoff = 10
+        self.max_cutoff = 100
         self.hessian_displacement_size = 1e-2
 
         self.rotate = True
@@ -42,163 +40,76 @@ class AdTherm:
             self.rotate = False
 
 
-    def generate_hessian_points(self, write_traj=True, write_x_train=True):
+    def generate_hessian_points(self):
         n = self.N_hessian
-        dft_list, coord = coord_generate(self, 'hessian', n)
-#        if write_xtrain:
-        np.savetxt('hessian_x_train.dat', coord)
-        #if write_traj:
-        traj = Trajectory('hessian_set.traj','w')
-        for image in dft_list:
-            traj.write(image)
-        return dft_list
+        dft_list, rigid_coords = coord_generate(self, 'hessian', n)
+        np.savetxt('hessian_x_train.dat', rigid_coords)
+        return dft_list, rigid_coords
 
     def generate_gauss_points(self, rigid_hessian, n_gauss, scale_gauss = 1):
         self.rigid_body_hessian = rigid_hessian
         n = n_gauss
         self.scale_gauss = scale_gauss
-        dft_list, coord = coord_generate(self, 'gauss', n)
-        np.savetxt('gauss_x_train.dat', coord)
-        traj = Trajectory('gauss_set.traj','w')
-        for image in dft_list:
-            traj.write(image)
-        return dft_list
+        dft_list, rigid_coords = coord_generate(self, 'gauss', n)
+        np.savetxt('gauss_x_train.dat', rigid_coords)
+        return dft_list, rigid_coords
 
     def generate_sobol_points(self, n_sobol):
         n = n_sobol
-        dft_list, coord = coord_generate(self, 'sobol', n)
-        np.savetxt('sobol_x_train.dat', coord)
-        traj = Trajectory('sobol_set.traj','w')
-        for image in dft_list:
-            traj.write(image)
-        return dft_list
+        dft_list, rigid_coords = coord_generate(self, 'sobol', n)
+        np.savetxt('sobol_x_train.dat', rigid_coords)
+        return dft_list, rigid_coords
 
     def generate_random_points(self, n_random):
         n = n_random
-        dft_list, coord = coord_generate(self, 'random', n)
-        np.savetxt('random_x_train.dat', coord)
-        traj = Trajectory('random_set.traj','w')
-        for image in dft_list:
-            traj.write(image)
-        return dft_list
+        dft_list, rigid_coords = coord_generate(self, 'random', n)
+        np.savetxt('random_x_train.dat', rigid_coords)
+        return dft_list, rigid_coords
 
-    def calculate_hessian(self, dft_list, fname):
+    def generate_rigid_hessian(self, dft_list):
         force_list = np.zeros([3 * len(self.indices), self.N_hessian])
         displacement_list = np.zeros([3 * len(self.indices), self.N_hessian])
         E_list = np.zeros(self.N_hessian)
-        for i, img in enumerate(dft_list):
-            f_atoms = img.get_forces()[self.indices]
-            force_list[:, i] = f_atoms.reshape(-1)
-            E_list[i] = img.get_potential_energy()
+        for i in range(len(dft_list)):
+            img = dft_list[i]
+            f_dft = img.calc.results['forces'] 
+            force_list[:, i] =f_dft[self.indices,:].reshape(-1)
+            E_list[i] = img.calc.results['energy']
             disp_atoms = img.positions[self.indices]
             displacement_list[:, i] = disp_atoms.reshape(-1)
-        #np.savetxt('hessian_y_train.dat', E_list)
         self.rigid_body_hessian = calculate_rigid_hessian(
                     self,
                     displacement_list,
                     force_list)
-        np.savetxt(fname, self.rigid_body_hessian)
+        np.savetxt('rigid_body_hessian.dat', self.rigid_body_hessian)
         return self.rigid_body_hessian
 
-    def write_y_train(self, dft_lists, filenames):
+    def write_y_train(self, dft_lists, fnames):
 
-        for j, dft_list in enumerate(dft_lists): 
+        for j in range(len(dft_lists)):
+            dft_list = dft_lists[j]
             E = np.zeros(len(dft_list))
-            for i, img in enumerate(dft_list):
+            for i in range(len(dft_list)):
+                img = dft_list[i]
                 E[i] = img.get_potential_energy()
-            np.savetxt(filenames[j], E)
+            np.savetxt(fnames[j], E)
 
+    def evaluate_stencil_points(self, dft_lists, coord_lists):
+        
+        for i in range(len(dft_lists)):
+            dft_list = dft_lists[i]
+            coord_list = coord_lists[i]
+            for j in range(len(dft_list)):
+                img = dft_list[j]
+                coord = coord_list[j]
+                xi, yi = bootstrap_points(self, img, coord)
+                if i == 0 and j == 0:
+                    x = xi
+                    y = yi
+                else:
+                    x = np.vstack((x,xi))
+                    y = np.vstack((y,yi))
+        np.savetxt('stencil_x_train.dat', x)
+        np.savetxt('stencil_y_train.dat', y)
 
-
-
-def run(self):
-
-        if self.bootstrap:
-            booty = open('bootstrap_y_train.dat', 'w')
-            bootx = open('bootstrap_x_train.dat', 'w')
-        dft_list, coord = self.coord_generate('hessian', self.N_hessian)
-        force_list = np.zeros([3 * len(self.indices), self.N_hessian])
-        displacement_list = np.zeros([3 * len(self.indices), self.N_hessian])
-        E_list = np.zeros(self.N_hessian)
-        y_train = open('hessian_y_train.dat', 'w')
-        for i, img in enumerate(dft_list):
-            f_atoms = img.get_forces()[self.indices]
-            force_list[:, i] = f_atoms.reshape(-1)
-            E_list[i] = img.get_potential_energy()
-            y_train.write(str(E_list[i]) + "\n")
-            disp_atoms = img.positions[self.indices]
-            displacement_list[:, i] = disp_atoms.reshape(-1)
-        y_train.close()
-        self.rigid_body_hessian = self.calculate_rigid_hessian(
-                    displacement_list,
-                    force_list)
-        np.savetxt('rigid_hessian.out', self.rigid_body_hessian)
-
-        if self.N_gauss:
-            dft_list, coords = self.coord_generate('gauss', self.N_gauss)
-            y_train = open('gauss_y_train.dat', 'w')
-            for i, img in enumerate(dft_list):
-                if self.relax_internals:
-                    c = FixExternals(img, self.indices)
-                    img.set_constraint(c)
-                    dyn = BFGS(img)
-                    dyn.run(fmax=0.05)
-                force = img.get_forces()[self.indices].reshape(-1)
-                E = img.get_potential_energy()
-                y_train.write(str(E) + '\n')
-                if self.bootstrap:
-                    xi, y = self.bootstrap_points(force, E, img, coords[i, :])
-                    for j in range(2 * self.ndim):
-                        x = xi[j, :]
-                        paramline = "%.6F\t%.6F\t%.6F\t%.6F\t%.6F\t%.6F\n" % (
-                                x[0], x[1], x[2], x[3], x[4], x[5])
-                        bootx.write(paramline)
-                        booty.write(str(y[j]) + '\n')
-            y_train.close()
-
-        if self.N_sobol:
-            dft_list, coord = self.coord_generate('sobol', self.N_sobol)
-            y_train = open('sobol_y_train.dat', 'w')
-            for i, img in enumerate(dft_list):
-                if self.relax_internals:
-                    c = FixExternals(img, self.indices)
-                    img.set_constraint(c)
-                    dyn = BFGS(img)
-                    dyn.run(fmax=0.05)
-                force = img.get_forces()[self.indices].reshape(-1)
-                E = img.get_potential_energy()
-                y_train.write(str(E) + '\n')
-                if self.bootstrap:
-                    xi, y = self.bootstrap_points(force, E, img, coords[i, :])
-                    for j in range(2 * self.ndim):
-                        x = xi[j, :]
-                        paramline = "%.6F\t%.6F\t%.6F\t%.6F\t%.6F\t%.6F\n" % (
-                                x[0], x[1], x[2], x[3], x[4], x[5])
-                        bootx.write(paramline)
-                        booty.write(str(y[j]) + '\n')
-            y_train.close()
-
-        if self.N_random:
-            dft_list, coord = self.coord_generate('random', self.N_random)
-            y_train = open('random_y_train.dat', 'w')
-            for i, img in enumerate(dft_list):
-                if self.relax_internals:
-                    c = FixExternals(img, self.indices)
-                    img.set_constraint(c)
-                    dyn = BFGS(img)
-                    dyn.run(fmax=0.05)
-                force = img.get_forces()[self.indices].reshape(-1)
-                E = img.get_potential_energy()
-                y_train.write(str(E) + '\n')
-                if self.bootstrap:
-                    xi, y = self.bootstrap_points(force, E, img, coords[i, :])
-                    for j in range(2 * self.ndim):
-                        x = xi[j, :]
-                        paramline = "%.6F\t%.6F\t%.6F\t%.6F\t%.6F\t%.6F\n" % (
-                                x[0], x[1], x[2], x[3], x[4], x[5])
-                        bootx.write(paramline)
-                        booty.write(str(y[j]) + '\n')
-            y_train.close()
-        if self.bootstrap:
-            bootx.close()
-            booty.close()
+ 

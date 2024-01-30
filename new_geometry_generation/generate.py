@@ -1,5 +1,5 @@
 import numpy as np
-from .functions import * 
+from functions import * 
 from sobol_seq import i4_sobol_generate
 
 def coord_generate(self, method, N_values):
@@ -49,7 +49,7 @@ def coord_generate(self, method, N_values):
         if valid and location == 'inside' or method == 'hessian':
             atoms = manipulate_atoms(self, coord)
             valid = get_min_max_distance(self, atoms.positions) 
-        
+
         if valid or method == 'hessian':
             coords[Iter, :] = coord
             Iter += 1
