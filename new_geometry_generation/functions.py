@@ -63,7 +63,7 @@ def bootstrap_points(self, atoms, coord):
     f_sub = -1 * np.matmul(np.transpose(B), force)
     dE = dx * f_sub
     x = np.zeros([2*self.ndim, 6])
-    y = np.zeros(2 * self.ndim)
+    y = np.zeros([2 * self.ndim, 1])
     for i in range(self.ndim):
         x[2 * i, :] = coord
         x[2 * i+1, :] = coord
