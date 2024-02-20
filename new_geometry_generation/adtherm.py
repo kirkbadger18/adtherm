@@ -9,80 +9,76 @@ from generate import coord_generate
 class AdTherm:
 
     def __init__(self,
-                 atoms,
+                 minima,
+                 hessians_3N,
                  indices,
                  z_below=1,
                  z_above=5):
 
-        self.atoms = atoms
-        self.indices = indices
-        self.adsorbate = self.atoms[indices].copy()
-        self.z_low = -z_below + np.min(self.adsorbate.positions[:, 2])
-        self.z_high = z_above + np.min(self.adsorbate.positions[:, 2])
-
-        self.N_atoms_in_adsorbate = len(self.adsorbate)
-        self.uc_x = atoms.get_cell_lengths_and_angles()[0]
-        self.uc_y = atoms.get_cell_lengths_and_angles()[1]
-        self.adsorbate_center_of_mass = self.adsorbate.get_center_of_mass()
-        self.min_cutoff = 0.2
-        self.max_cutoff = 100
-        self.hessian_displacement_size = 1e-2
-
+        self.N_atoms_in_adsorbate = len(indices)
         self.rotate = True
-        self.N_hessian = 12
         self.ndim = 6
         if self.N_atoms_in_adsorbate == 2:
-            self.N_hessian = 10
             self.ndim = 5
         elif self.N_atoms_in_adsorbate == 1:
-            self.N_hessian = 6
             self.ndim = 3
             self.rotate = False
 
+        self.minima = minima
+        self.indices = indices
+        self.adsorbates = []
+        self.rigid_hessians = []
+        self.coms = np.zeros([len(minima),3])
+        self.minima_coords = np.zeros([len(minima),self.ndim])
+        self.E_min = np.zeros([len(self.minima),1])
+        for i, minimum in enumerate(minima):
+            ads = minimum[self.indices].copy()
+            self.adsorbates.append(ads)
+            h = project_to_rigid_hessian(self, hessians_3N[i], minimum)
+            self.rigid_hessians.append(h)
+            self.coms[i,:] = ads.get_center_of_mass()
+            self.minima_coords[i,0:3] = self.coms[i,:]
+            self.E_min[i] = minimum.get_potential_energy()
+            if i != 0:
+                self.minima_coords[i,:] = map_coords_to_min0(self, minimum)
+        self.z_low = -z_below + np.min(self.coms[:, 2])
+        self.z_high = z_above + np.max(self.coms[:, 2])
+        self.uc_x = minima[0].get_cell_lengths_and_angles()[0]
+        self.uc_y = minima[0].get_cell_lengths_and_angles()[1]
+        self.min_cutoff = 0.2
+        self.max_cutoff = 100
 
-    def generate_hessian_points(self):
-        n = self.N_hessian
-        dft_list, rigid_coords = coord_generate(self, 'hessian', n)
-        np.savetxt('hessian_x_train.dat', rigid_coords)
-        return dft_list, rigid_coords
+################ add function t get rhombus info   ##################
 
-    def generate_gauss_points(self, rigid_hessian, n_gauss, scale_gauss = 1):
-        self.rigid_body_hessian = rigid_hessian
-        n = n_gauss
-        self.scale_gauss = scale_gauss
-        dft_list, rigid_coords = coord_generate(self, 'gauss', n)
-        np.savetxt('gauss_x_train.dat', rigid_coords)
+    def generate_gauss_points(self, n_gauss, scale_gauss):
+        for i in range(len(self.minima)):
+            self.scale_gauss = scale_gauss[i]
+            n = n_gauss[i]
+            if i == 0:
+                dft_list, rigid_coords = coord_generate(self, 'gauss', n, i)
+            else:
+                new_list, new_coords = coord_generate(self, 'gauss', n, i)
+                ### need to map coords to that of initial minima #####
+                for j in range(len(new_list)):
+                    dft_list.append(new_list[j])
+                rigid_coords = np.vstack((rigid_coords, new_coords))
         return dft_list, rigid_coords
 
     def generate_sobol_points(self, n_sobol):
         n = n_sobol
         dft_list, rigid_coords = coord_generate(self, 'sobol', n)
-        np.savetxt('sobol_x_train.dat', rigid_coords)
         return dft_list, rigid_coords
 
     def generate_random_points(self, n_random):
         n = n_random
         dft_list, rigid_coords = coord_generate(self, 'random', n)
-        np.savetxt('random_x_train.dat', rigid_coords)
         return dft_list, rigid_coords
 
-    def generate_rigid_hessian(self, dft_list):
-        force_list = np.zeros([3 * len(self.indices), self.N_hessian])
-        displacement_list = np.zeros([3 * len(self.indices), self.N_hessian])
-        E_list = np.zeros(self.N_hessian)
-        for i in range(len(dft_list)):
-            img = dft_list[i]
-            f_dft = img.calc.results['forces'] 
-            force_list[:, i] =f_dft[self.indices,:].reshape(-1)
-            E_list[i] = img.calc.results['energy']
-            disp_atoms = img.positions[self.indices]
-            displacement_list[:, i] = disp_atoms.reshape(-1)
-        self.rigid_body_hessian = calculate_rigid_hessian(
-                    self,
-                    displacement_list,
-                    force_list)
-        np.savetxt('rigid_body_hessian.dat', self.rigid_body_hessian)
-        return self.rigid_body_hessian
+    def write_x_train(self, coords, fnames):
+
+        for j in range(len(coords)):
+            coord = coords[j]
+            np.savetxt(fnames[j], coord)
 
     def write_y_train(self, dft_lists, fnames):
 
@@ -94,7 +90,7 @@ class AdTherm:
                 E[i] = img.get_potential_energy()
             np.savetxt(fnames[j], E)
 
-    def evaluate_stencil_points(self, dft_lists, coord_lists):
+    def evaluate_stencil_points(self, dft_lists, coord_lists, namelist):
         
         for i in range(len(dft_lists)):
             dft_list = dft_lists[i]
@@ -109,7 +105,11 @@ class AdTherm:
                 else:
                     x = np.vstack((x,xi))
                     y = np.vstack((y,yi))
-        np.savetxt('stencil_x_train.dat', x)
-        np.savetxt('stencil_y_train.dat', y)
+        np.savetxt(namelist[0], x)
+        np.savetxt(namelist[1], y)
+
+    def write_minima_info(self, namelist):
+        np.savetxt(namelist[0], self.minima_coords)
+        np.savetxt(namelist[1], self.E_min)
 
  

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=AdTherm_test
 #SBATCH --time=48:00:00
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=48
 #SBATCH --mem=96G
 #SBATCH --account=cfgoldsm-condo
