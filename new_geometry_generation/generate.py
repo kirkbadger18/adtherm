@@ -2,8 +2,9 @@ import numpy as np
 from functions import * 
 from sobol_seq import i4_sobol_generate
 
-def coord_generate(self, method, N_values):
+def coord_generate(self, method, N_values, minima_index=0):
     dft_jobs = []
+    k = minima_index
     coords = np.zeros([N_values, self.ndim])
     Iter = 0
     sobol_n = 0
@@ -12,8 +13,8 @@ def coord_generate(self, method, N_values):
 
         if method == 'gauss':
             gaussmean = np.zeros(self.ndim)
-            gaussmean[0:3] = self.adsorbate_center_of_mass
-            hess = self.rigid_body_hessian
+            gaussmean[0:3] = self.coms[k,:]
+            hess = self.rigid_hessians[k]
             gausscov = self.scale_gauss * LA.inv(hess)
             rand = np.random.multivariate_normal(
                     gaussmean,
@@ -38,19 +39,17 @@ def coord_generate(self, method, N_values):
                 coord[3:self.ndim] -= np.pi
                 coord[4] *= 0.5
 
-        if method == 'hessian':
-            coord[int(Iter / 2)] = self.hessian_displacement_size
-            coord[0:3] += self.adsorbate_center_of_mass
-            self.hessian_displacement_size *= -1
-
         valid, location = check_coord(self, coord)
-        if valid and location == 'outside' and method != 'hessian':
+        if valid and location == 'outside':
             coord, location = move_inside(self, coord)
-        if valid and location == 'inside' or method == 'hessian':
-            atoms = manipulate_atoms(self, coord)
+        if valid and location == 'inside':
+            atoms = manipulate_atoms(self, coord, k)
             valid = get_min_max_distance(self, atoms.positions) 
 
-        if valid or method == 'hessian':
+        
+        if valid:
+            if method == 'gauss' and minima_index > 0 and self.rotate:
+                coord = map_coords_to_min0(self, atoms) 
             coords[Iter, :] = coord
             Iter += 1
             dft_jobs.append(atoms)
@@ -133,17 +132,17 @@ def move_inside(self, coord):
     else:
         return coord, location
 
-def manipulate_atoms(self, coord):
+def manipulate_atoms(self, coord, k):
     conv = 180 / np.pi
-    pa = np.transpose(self.adsorbate.get_moments_of_inertia(
+    pa = np.transpose(self.adsorbates[k].get_moments_of_inertia(
             vectors=True)[1])
-    atoms = self.atoms.copy()
-    adsorbate = self.adsorbate.copy()
+    atoms = self.minima[k].copy()
+    adsorbate = self.adsorbates[k].copy()
     if self.rotate:
-        adsorbate.rotate(conv * coord[3], pa[:, 0], 'COM')
+        adsorbate.rotate(conv * coord[3], pa[:, 2], 'COM')
         adsorbate.rotate(conv * coord[4], pa[:, 1], 'COM')
         if self.ndim == 6:
-            adsorbate.rotate(conv * coord[5], pa[:, 2], 'COM')
-    adsorbate.translate(coord[0:3] - self.adsorbate_center_of_mass)
+            adsorbate.rotate(conv * coord[5], pa[:, 0], 'COM')
+    adsorbate.translate(coord[0:3] - self.coms[k])
     atoms.positions[self.indices] = adsorbate.positions
     return atoms
