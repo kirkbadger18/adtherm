@@ -2,20 +2,20 @@ import numpy as np
 from functions import * 
 from sobol_seq import i4_sobol_generate
 
-def coord_generate(self, method, N_values, minima_index=0):
+def coord_generate(AdTherm, method, N_values, minima_index=0):
     dft_jobs = []
     k = minima_index
-    coords = np.zeros([N_values, self.ndim])
+    coords = np.zeros([N_values, AdTherm.ndim])
     Iter = 0
     sobol_n = 0
     while Iter < N_values:
-        coord = np.zeros(self.ndim)
+        coord = np.zeros(AdTherm.ndim)
 
         if method == 'gauss':
-            gaussmean = np.zeros(self.ndim)
-            gaussmean[0:3] = self.coms[k,:]
-            hess = self.rigid_hessians[k]
-            gausscov = self.scale_gauss * LA.inv(hess)
+            gaussmean = np.zeros(AdTherm.ndim)
+            gaussmean[0:3] = AdTherm.coms[k,:]
+            hess = AdTherm.rigid_hessians[k]
+            gausscov = AdTherm.scale_gauss * LA.inv(hess)
             rand = np.random.multivariate_normal(
                     gaussmean,
                     gausscov,
@@ -24,47 +24,47 @@ def coord_generate(self, method, N_values, minima_index=0):
             coord = rand[0]
         if method == 'random' or method == 'sobol':
             if method == 'sobol':
-                coord = i4_sobol_generate(self.ndim, 1, sobol_n+1)[0, :]
+                coord = i4_sobol_generate(AdTherm.ndim, 1, sobol_n+1)[0, :]
                 sobol_n += 1
             if method == 'random':
-                coord = np.random.uniform(0, 1, size=self.ndim)
+                coord = np.random.uniform(0, 1, size=AdTherm.ndim)
 
-            coord[1] *= self.uc_y / 3
-            coord[0] *= self.uc_x / 3
+            coord[1] *= AdTherm.unit_cell_y / 3
+            coord[0] *= AdTherm.unit_cell_x / 3
             coord[0] += coord[1] / np.sqrt(3)
-            coord[2] *= self.z_high - self.z_low
-            coord[2] += self.z_low
-            if self.ndim >= 5:
-                coord[3:self.ndim] *= 2 * np.pi
-                coord[3:self.ndim] -= np.pi
+            coord[2] *= AdTherm.z_high - AdTherm.z_low
+            coord[2] += AdTherm.z_low
+            if AdTherm.ndim >= 5:
+                coord[3:AdTherm.ndim] *= 2 * np.pi
+                coord[3:AdTherm.ndim] -= np.pi
                 coord[4] *= 0.5
 
-        valid, location = check_coord(self, coord)
+        valid, location = check_coord(AdTherm, coord)
         if valid and location == 'outside':
-            coord, location = move_inside(self, coord)
+            coord, location = move_inside(AdTherm, coord)
         if valid and location == 'inside':
-            atoms = manipulate_atoms(self, coord, k)
-            valid = get_min_max_distance(self, atoms.positions) 
+            atoms = manipulate_atoms(AdTherm, coord, k)
+            valid = get_min_max_distance(AdTherm, atoms.positions) 
 
         
         if valid:
-            if method == 'gauss' and minima_index > 0 and self.rotate:
-                coord = map_coords_to_min0(self, atoms) 
+            if method == 'gauss' and minima_index > 0 and AdTherm.rotate:
+                coord = map_coords_to_min0(AdTherm, atoms) 
             coords[Iter, :] = coord
             Iter += 1
             dft_jobs.append(atoms)
 
     return dft_jobs, coords
 
-def check_coord(self, coord):
-    uc_x = self.uc_x / 3.0
-    uc_y = self.uc_y / 3.0
+def check_coord(AdTherm, coord):
+    uc_x = AdTherm.unit_cell_x / 3.0
+    uc_y = AdTherm.unit_cell_y / 3.0
     y_ub = uc_y
     y_lb = 0.0
     x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
     x_lb = coord[1] * (1. / np.sqrt(3))
-    z_ub = self.z_high
-    z_lb = self.z_low
+    z_ub = AdTherm.z_high
+    z_lb = AdTherm.z_low
     valid = True
     location = 'inside'
     if coord[2] > z_ub or coord[2] < z_lb:
@@ -73,19 +73,19 @@ def check_coord(self, coord):
         location = 'outside'
     if coord[1] > y_ub or coord[1] < y_lb:
         location = 'outside'
-    if self.ndim >= 5:    
+    if AdTherm.ndim >= 5:    
         if coord[3] > np.pi or coord[3] < -np.pi:
             location = 'outside'
         if coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
             location = 'outside'
-    if self.ndim == 6:
+    if AdTherm.ndim == 6:
         if coord[5] > np.pi or coord[5] < -np.pi:
             location = 'outside'
     return valid, location
 
-def move_inside(self, coord):
-    uc_x = self.uc_x / 3.0
-    uc_y = self.uc_y / 3.0
+def move_inside(AdTherm, coord):
+    uc_x = AdTherm.unit_cell_x / 3.0
+    uc_y = AdTherm.unit_cell_y / 3.0
     y_ub = uc_y
     y_lb = 0.0
     x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
@@ -105,7 +105,7 @@ def move_inside(self, coord):
             coord[0] -= uc_x
         elif coord[0] < x_lb:
             coord[0] += uc_x
-    if self.ndim >= 5:
+    if AdTherm.ndim >= 5:
         while coord[3] > np.pi or coord[3] < -np.pi:
             if coord[3] > np.pi:
                 coord[3] -= 2 * np.pi
@@ -120,29 +120,29 @@ def move_inside(self, coord):
                 coord[4] += np.pi
                 sign = np.sign(coord[3])
                 coord[3] = sign * (np.pi - np.abs(coord[3]))
-    if self.ndim == 6:
+    if AdTherm.ndim == 6:
         while coord[5] > np.pi or coord[5] < -np.pi:
             if coord[5] > np.pi:
                 coord[5] -= 2 * np.pi
             if coord[5] < -np.pi:
                 coord[5] += 2 * np.pi
-    valid, location = check_coord(self, coord)
+    valid, location = check_coord(AdTherm, coord)
     if not valid or location == 'outside':
         raise Exception("move inside function not working")
     else:
         return coord, location
 
-def manipulate_atoms(self, coord, k):
+def manipulate_atoms(AdTherm, coord, k):
     conv = 180 / np.pi
-    pa = np.transpose(self.adsorbates[k].get_moments_of_inertia(
+    pa = np.transpose(AdTherm.adsorbates[k].get_moments_of_inertia(
             vectors=True)[1])
-    atoms = self.minima[k].copy()
-    adsorbate = self.adsorbates[k].copy()
-    if self.rotate:
+    atoms = AdTherm.minima[k].copy()
+    adsorbate = AdTherm.adsorbates[k].copy()
+    if AdTherm.rotate:
         adsorbate.rotate(conv * coord[3], pa[:, 2], 'COM')
         adsorbate.rotate(conv * coord[4], pa[:, 1], 'COM')
-        if self.ndim == 6:
+        if AdTherm.ndim == 6:
             adsorbate.rotate(conv * coord[5], pa[:, 0], 'COM')
-    adsorbate.translate(coord[0:3] - self.coms[k])
-    atoms.positions[self.indices] = adsorbate.positions
+    adsorbate.translate(coord[0:3] - AdTherm.coms[k])
+    atoms.positions[AdTherm.indices] = adsorbate.positions
     return atoms

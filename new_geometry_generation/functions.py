@@ -1,58 +1,60 @@
 import numpy.linalg as LA
 import numpy as np
 from scipy.optimize import least_squares
-def get_min_max_distance(self, pos):
+def get_min_max_distance(AdTherm, pos):
         min_dist = 100.0
         max_dist = 0.0
         valid = True
         for i in range(len(pos)):
-            if i not in self.indices:
-                for j in self.indices:
+            if i not in AdTherm.indices:
+                for j in AdTherm.indices:
                     local_dist = LA.norm(pos[i, :]-pos[j, :])
                     if local_dist < min_dist:
                         min_dist = local_dist
                     if local_dist > max_dist:
                         max_dist = local_dist
-        if min_dist < self.min_cutoff or max_dist > self.max_cutoff:
+        too_close = min_dist < AdTherm.min_atomic_distance
+        too_far = max_dist > AdTherm.max_atomic_distance
+        if too_close or too_far:
             valid = False
         return valid
 
-def project_to_rigid_hessian(self, H, atoms):
-    B = get_external_basis(self, atoms)
+def project_to_rigid_hessian(AdTherm, H, atoms):
+    B = get_external_basis(AdTherm, atoms)
     H_sub = np.matmul(B.T,np.matmul(H,B))
+    print(H_sub.round(2))
     return H_sub
 
-def get_external_basis(self, atoms):
-    ads = atoms[self.indices].copy()
+def get_external_basis(AdTherm, atoms):
+    ads = atoms[AdTherm.indices].copy()
     com = ads.get_center_of_mass()
-    pa = np.transpose(ads.get_moments_of_inertia(vectors=True)[1])
-    B = np.zeros([3 * len(self.indices), self.ndim])
-    ads_pos = ads.positions-com
-    for i in range(len(self.indices)):
+    pa = ads.get_moments_of_inertia(vectors=True)[1].T
+    B = np.zeros([3 * len(AdTherm.indices), AdTherm.ndim])
+    ads_pos = ads.positions - com
+    for i in range(len(AdTherm.indices)):
         B[3*i, 0] = 1
         B[3*i+1, 1] = 1
         B[3*i+2, 2] = 1
-        if self.ndim > 3:
+        if AdTherm.ndim > 3:
             B[3*i:3*i+3, 3] = np.cross(ads_pos[i, :], pa[:, 2])
             B[3*i:3*i+3, 4] = np.cross(ads_pos[i, :], pa[:, 1])
-            if self.ndim > 5:
+            if AdTherm.ndim > 5:
                 B[3*i:3*i+3, 5] = np.cross(ads_pos[i, :], pa[:, 0])
-    for i in range(self.ndim):
+    for i in range(AdTherm.ndim):
         B[:, i] *= 1 / LA.norm(np.copy(B[:, i]))
-    q, r = LA.qr(B)
-    return q
+    return B
 
-def bootstrap_points(self, atoms, coord):
+def bootstrap_points(AdTherm, atoms, coord):
     force_all = atoms.calc.results['forces']
-    force = force_all[self.indices].reshape(-1)
+    force = force_all[AdTherm.indices].reshape(-1)
     E = atoms.calc.results['energy']
     dx = 1e-2
-    B = get_external_basis(self, atoms)
+    B = get_external_basis(AdTherm, atoms)
     f_sub = -1 * np.matmul(np.transpose(B), force)
     dE = dx * f_sub
-    x = np.zeros([2*self.ndim, 6])
-    y = np.zeros([2 * self.ndim, 1])
-    for i in range(self.ndim):
+    x = np.zeros([2*AdTherm.ndim, AdTherm.ndim])
+    y = np.zeros([2 * AdTherm.ndim, 1])
+    for i in range(AdTherm.ndim):
         x[2 * i, :] = coord
         x[2 * i+1, :] = coord
         x[2 * i, i] -= 0.5 * dx
@@ -61,13 +63,13 @@ def bootstrap_points(self, atoms, coord):
         y[2 * i+1] = E + 0.5 * dE[i]
     return x, y
 
-def map_coords_to_min0(self, atoms):
-    coord = np.zeros(self.ndim)
-    ref_ads = self.adsorbates[0].copy()
-    ref_com = self.coms[0,:]
+def map_coords_to_min0(AdTherm, atoms):
+    coord = np.zeros(AdTherm.ndim)
+    ref_ads = AdTherm.adsorbates[0].copy()
+    ref_com = AdTherm.coms[0,:]
     ref_pa =  np.transpose(ref_ads.get_moments_of_inertia(vectors=True)[1])
     ref_pos = ref_ads.positions-ref_com
-    ads = atoms[self.indices].copy()
+    ads = atoms[AdTherm.indices].copy()
     com = ads.get_center_of_mass()
     pa = np.transpose(ads.get_moments_of_inertia(vectors=True)[1])
     pos = ads.positions - com
@@ -103,17 +105,18 @@ def map_coords_to_min0(self, atoms):
     def system(x,b=A_solve):
         return(f(x)-b)
 
-    if self.ndim == 6:
+    if AdTherm.ndim == 6:
         x=least_squares(system,
                         np.asarray((0,0,0)),
                         bounds=([-np.pi, -np.pi/2, -np.pi],
                                 [np.pi, np.pi/2, np.inf]))
-    elif self.ndim == 5:
+    elif AdTherm.ndim == 5:
         x=least_squares(system,
                         np.asarray((0,0,0)),
-                        bounds=([-np.pi, -np.pi, 0],
-                                [np.pi, np.pi, 0]))
+                        bounds=([-np.pi, -np.pi, -1e-8],
+                                [np.pi, np.pi, 1e-8]))
 
     coord[0:3] = com
-    coord[3:self.ndim] = x.x
+    if AdTherm.ndim > 3:
+        coord[3::] = x.x[0:AdTherm.ndim-3]
     return coord    

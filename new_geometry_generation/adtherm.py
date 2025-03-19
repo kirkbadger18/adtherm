@@ -1,7 +1,4 @@
 import numpy as np
-import numpy.linalg as LA
-from ase.io.trajectory import Trajectory
-from ase.optimize import BFGS
 from functions import *
 from generate import coord_generate 
 
@@ -10,12 +7,48 @@ class AdTherm:
 
     def __init__(self,
                  minima,
-                 hessians_3N,
                  indices,
-                 z_below=1,
-                 z_above=5):
+                 hessians_3N = None,
+                 dz_limits= [-1, 5]):
 
-        self.N_atoms_in_adsorbate = len(indices)
+        self.minima = minima
+        self.indices = indices
+        self.hessians_3N = hessians_3N
+        self.dz_limits = dz_limits
+        
+        self._assess_degrees_of_freedom()
+        self._get_minima_information()
+        self._set_domain_limits()
+ 
+    def _set_domain_limits(self):
+
+        self.z_low = self.dz_limits[0] + np.min(self.coms[:, 2])
+        self.z_high = self.dz_limits[1] + np.max(self.coms[:, 2])
+        self.unit_cell_x = self.minima[0].get_cell_lengths_and_angles()[0]
+        self.unit_cell_y = self.minima[0].get_cell_lengths_and_angles()[1]
+        self.min_atomic_distance = 0.2
+        self.max_atomic_distance = 100
+
+    def _get_minima_information(self):
+
+        self.adsorbates = []
+        self.rigid_hessians = []
+        self.coms = np.zeros([len(self.minima),3])
+        self.minima_coords = np.zeros([len(self.minima),self.ndim])
+        self.E_min = np.zeros([len(self.minima),1])
+        for i, minimum in enumerate(self.minima):
+            ads = minimum[self.indices].copy()
+            self.adsorbates.append(ads)
+            h = project_to_rigid_hessian(self, self.hessians_3N[i], minimum)
+            self.rigid_hessians.append(h)
+            self.coms[i,:] = ads.get_center_of_mass()
+            self.minima_coords[i,0:3] = self.coms[i,:]
+            self.E_min[i] = minimum.calc.results['energy'] #get_potential_energy()
+            if i != 0:
+                self.minima_coords[i,:] = map_coords_to_min0(self, minimum)
+
+    def _assess_degrees_of_freedom(self):
+        self.N_atoms_in_adsorbate = len(self.indices)
         self.rotate = True
         self.ndim = 6
         if self.N_atoms_in_adsorbate == 2:
@@ -24,41 +57,17 @@ class AdTherm:
             self.ndim = 3
             self.rotate = False
 
-        self.minima = minima
-        self.indices = indices
-        self.adsorbates = []
-        self.rigid_hessians = []
-        self.coms = np.zeros([len(minima),3])
-        self.minima_coords = np.zeros([len(minima),self.ndim])
-        self.E_min = np.zeros([len(self.minima),1])
-        for i, minimum in enumerate(minima):
-            ads = minimum[self.indices].copy()
-            self.adsorbates.append(ads)
-            h = project_to_rigid_hessian(self, hessians_3N[i], minimum)
-            self.rigid_hessians.append(h)
-            self.coms[i,:] = ads.get_center_of_mass()
-            self.minima_coords[i,0:3] = self.coms[i,:]
-            self.E_min[i] = minimum.get_potential_energy()
-            if i != 0:
-                self.minima_coords[i,:] = map_coords_to_min0(self, minimum)
-        self.z_low = -z_below + np.min(self.coms[:, 2])
-        self.z_high = z_above + np.max(self.coms[:, 2])
-        self.uc_x = minima[0].get_cell_lengths_and_angles()[0]
-        self.uc_y = minima[0].get_cell_lengths_and_angles()[1]
-        self.min_cutoff = 0.2
-        self.max_cutoff = 100
-
 ################ add function t get rhombus info   ##################
 
-    def generate_gauss_points(self, n_gauss, scale_gauss):
+    def generate_gauss_points(self, n_gauss, temperature):
+        kb = 8.617E-5
         for i in range(len(self.minima)):
-            self.scale_gauss = scale_gauss[i]
+            self.scale_gauss = temperature * kb
             n = n_gauss[i]
             if i == 0:
                 dft_list, rigid_coords = coord_generate(self, 'gauss', n, i)
             else:
                 new_list, new_coords = coord_generate(self, 'gauss', n, i)
-                ### need to map coords to that of initial minima #####
                 for j in range(len(new_list)):
                     dft_list.append(new_list[j])
                 rigid_coords = np.vstack((rigid_coords, new_coords))
@@ -87,7 +96,7 @@ class AdTherm:
             E = np.zeros(len(dft_list))
             for i in range(len(dft_list)):
                 img = dft_list[i]
-                E[i] = img.get_potential_energy()
+                E[i] = img.calc.results['energy'] #get_potential_energy()
             np.savetxt(fnames[j], E)
 
     def evaluate_stencil_points(self, dft_lists, coord_lists, namelist):
