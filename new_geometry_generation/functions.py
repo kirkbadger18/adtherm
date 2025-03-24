@@ -21,6 +21,7 @@ def get_min_max_distance(AdTherm, pos):
 
 def project_to_rigid_hessian(AdTherm, H, atoms):
     B = get_external_basis(AdTherm, atoms)
+
     H_sub = np.matmul(B.T,np.matmul(H,B))
     print(H_sub.round(2))
     return H_sub
@@ -42,7 +43,26 @@ def get_external_basis(AdTherm, atoms):
                 B[3*i:3*i+3, 5] = np.cross(ads_pos[i, :], pa[:, 0])
     for i in range(AdTherm.ndim):
         B[:, i] *= 1 / LA.norm(np.copy(B[:, i]))
+        if i > 2:
+            pai = [0, 0, 0, 2, 1, 0]
+            l = LA.norm(B[0:3,i])
+            a = np.dot(ads_pos[0,:], pa[:,pai[i]])
+            c = LA.norm(ads_pos[0,:])
+            r = np.sqrt(c**2-a**2)
+            d_theta = l / r
+            B[:,i] *= 1 / d_theta
+            print(l / r)
     return B
+
+def get_rot_vec(ads_pos, pa):
+    vec = np.cross(ads_pos, pa)
+    c = LA.norm(ads_pos)
+    a = np.dot(ads_pos, pa)
+    b = np.sqrt(c**2 - a**2)
+    scale = b / LA.norm(vec)
+    vec *= scale
+    return vec
+
 
 def bootstrap_points(AdTherm, atoms, coord):
     force_all = atoms.calc.results['forces']
@@ -57,7 +77,7 @@ def bootstrap_points(AdTherm, atoms, coord):
     for i in range(AdTherm.ndim):
         x[2 * i, :] = coord
         x[2 * i+1, :] = coord
-        x[2 * i, i] -= 0.5 * dx
+        #x[2 * i, i] -= 0.5 * dx
         x[2 * i+1, i] += 0.5 * dx
         y[2 * i] = E - 0.5 * dE[i]
         y[2 * i+1] = E + 0.5 * dE[i]

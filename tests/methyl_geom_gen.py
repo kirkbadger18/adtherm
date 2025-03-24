@@ -53,50 +53,50 @@ ads = AdTherm([atoms1, atoms2], indices, [hessian_3N_1, hessian_3N_2])
 
 ########### Generate points ###########
 gauss_points, gauss_coords  = ads.generate_gauss_points(n_gauss=[10, 10], temperature=500)
-sobol_points, sobol_coords = ads.generate_sobol_points(n_sobol=3)
-random_points, random_coords = ads.generate_random_points(n_random=3)
+#sobol_points, sobol_coords = ads.generate_sobol_points(n_sobol=3)
+#random_points, random_coords = ads.generate_random_points(n_random=3)
 
 ########### Run dft calcs ##################
 os.mkdir('gauss')
-os.mkdir('sobol')
-os.mkdir('random')
-os.mkdir('stencil')
+#os.mkdir('sobol')
+#os.mkdir('random')
+#os.mkdir('stencil')
 
 gauss_traj = Trajectory('gauss/gauss_set.traj', 'w')
-sobol_traj = Trajectory('sobol/sobol_set.traj', 'w')
-random_traj = Trajectory('random/random_set.traj', 'w')
+#sobol_traj = Trajectory('sobol/sobol_set.traj', 'w')
+#random_traj = Trajectory('random/random_set.traj', 'w')
 
-for i in range(len(sobol_points)):
-    sobol_points[i].calc = copy.copy(calc)
-    sobol_points[i].get_forces()
-    sobol_traj.write(sobol_points[i])
+#for i in range(len(sobol_points)):
+#    sobol_points[i].calc = copy.copy(calc)
+#    sobol_points[i].get_forces()
+#    sobol_traj.write(sobol_points[i])
 for i in range(len(gauss_points)):
     gauss_points[i].calc = copy.copy(calc)
-    gauss_points[i].get_forces()
+#    gauss_points[i].get_forces()
     gauss_traj.write(gauss_points[i])
-for i in range(len(random_points)):
-    random_points[i].calc = copy.copy(calc)
-    random_points[i].get_forces()
-    random_traj.write(random_points[i])
+#for i in range(len(random_points)):
+#    random_points[i].calc = copy.copy(calc)
+#    random_points[i].get_forces()
+#    random_traj.write(random_points[i])
 
 ########### get training points ###########
-ads.write_x_train([gauss_coords, sobol_coords, random_coords],
-                  ['gauss/gauss_x_train.dat',
-                   'sobol/sobol_x_train.dat',
-                   'random/random_x_train.dat'])
+#ads.write_x_train([gauss_coords, sobol_coords, random_coords],
+#                  ['gauss/gauss_x_train.dat',
+#                   'sobol/sobol_x_train.dat',
+#                   'random/random_x_train.dat'])
 
-ads.write_y_train([gauss_points, sobol_points, random_points],
-                  ['gauss/gauss_y_train.dat',
-                   'sobol/sobol_y_train.dat',
-                   'random/random_y_train.dat'])
+#ads.write_y_train([gauss_points, sobol_points, random_points],
+#                  ['gauss/gauss_y_train.dat',
+#                   'sobol/sobol_y_train.dat',
+#                   'random/random_y_train.dat'])
 
-ads.write_minima_info(['minima/minima_x_train.dat',
-                       'minima/minima_y_train.dat'])
+#ads.write_minima_info(['minima/minima_x_train.dat',
+#                       'minima/minima_y_train.dat'])
 
-ads.evaluate_stencil_points([gauss_points, sobol_points, random_points],
-                            [gauss_coords, sobol_coords, random_coords],
-                            ['stencil/stencil_x_train.dat',
-                             'stencil/stencil_y_train.dat'])
+#ads.evaluate_stencil_points([gauss_points, sobol_points, random_points],
+#                            [gauss_coords, sobol_coords, random_coords],
+#                            ['stencil/stencil_x_train.dat',
+#                             'stencil/stencil_y_train.dat'])
 
 
 
