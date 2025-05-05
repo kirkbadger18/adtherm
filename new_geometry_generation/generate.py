@@ -10,9 +10,9 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
     sobol_n = 0
     while Iter < N_values:
         coord = np.zeros(AdTherm.ndim)
-
         if method == 'gauss':
             gaussmean = np.zeros(AdTherm.ndim)
+            #gaussmean =  minima_coords[k,:]
             gaussmean[0:3] = AdTherm.coms[k,:]
             hess = AdTherm.rigid_hessians[k]
             gausscov = AdTherm.scale_gauss * LA.inv(hess)
@@ -22,6 +22,7 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
                     size=1,
                     check_valid='warn')
             coord = rand[0]
+    
         if method == 'random' or method == 'sobol':
             if method == 'sobol':
                 coord = i4_sobol_generate(AdTherm.ndim, 1, sobol_n+1)[0, :]
@@ -40,16 +41,18 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
                 coord[4] *= 0.5
 
         valid, location = check_coord(AdTherm, coord)
-        if valid and location == 'outside':
-            coord, location = move_inside(AdTherm, coord)
-        if valid and location == 'inside':
+        if valid: # and location == 'inside':
             atoms = manipulate_atoms(AdTherm, coord, k)
             valid = get_min_max_distance(AdTherm, atoms.positions) 
 
-        
+        if valid and location == 'outside':
+            coord, location = move_inside(AdTherm, coord)
+
         if valid:
             if method == 'gauss' and minima_index > 0 and AdTherm.rotate:
-                coord = map_coords_to_min0(AdTherm, atoms) 
+                print('before: ', coord[3])
+                coord[3::] = map_rotation_to_min0(AdTherm, atoms) 
+                print('after: ',coord[3])
             coords[Iter, :] = coord
             Iter += 1
             dft_jobs.append(atoms)
@@ -105,27 +108,27 @@ def move_inside(AdTherm, coord):
             coord[0] -= uc_x
         elif coord[0] < x_lb:
             coord[0] += uc_x
-    if AdTherm.ndim >= 5:
-        while coord[3] > np.pi or coord[3] < -np.pi:
-            if coord[3] > np.pi:
-                coord[3] -= 2 * np.pi
-            if coord[3] < -np.pi:
-                coord[3] += 2 * np.pi
-        while coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
-            if coord[4] > 0.5 * np.pi:
-                coord[4] -= np.pi
-                sign = np.sign(coord[3])
-                coord[3] = sign * (np.pi - np.abs(coord[3]))
-            if coord[4] < -0.5 * np.pi:
-                coord[4] += np.pi
-                sign = np.sign(coord[3])
-                coord[3] = sign * (np.pi - np.abs(coord[3]))
-    if AdTherm.ndim == 6:
-        while coord[5] > np.pi or coord[5] < -np.pi:
-            if coord[5] > np.pi:
-                coord[5] -= 2 * np.pi
-            if coord[5] < -np.pi:
-                coord[5] += 2 * np.pi
+    #if AdTherm.ndim >= 5:
+    #    while coord[3] > np.pi or coord[3] < -np.pi:
+    #        if coord[3] > np.pi:
+    #            coord[3] -= 2 * np.pi
+    #        if coord[3] < -np.pi:
+    #            coord[3] += 2 * np.pi
+    #    while coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
+    #        if coord[4] > 0.5 * np.pi:
+    #            coord[4] -= np.pi
+    #            sign = np.sign(coord[3])
+    #            coord[3] = sign * (np.pi - np.abs(coord[3]))
+    #        if coord[4] < -0.5 * np.pi:
+    #            coord[4] += np.pi
+    #            sign = np.sign(coord[3])
+    #            coord[3] = sign * (np.pi - np.abs(coord[3]))
+    #if AdTherm.ndim == 6:
+    #    while coord[5] > np.pi or coord[5] < -np.pi:
+    #        if coord[5] > np.pi:
+    #            coord[5] -= 2 * np.pi
+    #        if coord[5] < -np.pi:
+    #            coord[5] += 2 * np.pi
     valid, location = check_coord(AdTherm, coord)
     if not valid or location == 'outside':
         raise Exception("move inside function not working")
@@ -134,8 +137,7 @@ def move_inside(AdTherm, coord):
 
 def manipulate_atoms(AdTherm, coord, k):
     conv = 180 / np.pi
-    pa = np.transpose(AdTherm.adsorbates[k].get_moments_of_inertia(
-            vectors=True)[1])
+    pa = AdTherm.adsorbates[k].get_moments_of_inertia(vectors=True)[1].T
     atoms = AdTherm.minima[k].copy()
     adsorbate = AdTherm.adsorbates[k].copy()
     if AdTherm.rotate:

@@ -1,6 +1,8 @@
 import numpy.linalg as LA
 import numpy as np
 from scipy.optimize import least_squares
+
+
 def get_min_max_distance(AdTherm, pos):
         min_dist = 100.0
         max_dist = 0.0
@@ -21,9 +23,8 @@ def get_min_max_distance(AdTherm, pos):
 
 def project_to_rigid_hessian(AdTherm, H, atoms):
     B = get_external_basis(AdTherm, atoms)
-
     H_sub = np.matmul(B.T,np.matmul(H,B))
-    print(H_sub.round(2))
+    print(H_sub.round(3))
     return H_sub
 
 def get_external_basis(AdTherm, atoms):
@@ -41,28 +42,7 @@ def get_external_basis(AdTherm, atoms):
             B[3*i:3*i+3, 4] = np.cross(ads_pos[i, :], pa[:, 1])
             if AdTherm.ndim > 5:
                 B[3*i:3*i+3, 5] = np.cross(ads_pos[i, :], pa[:, 0])
-    for i in range(AdTherm.ndim):
-        B[:, i] *= 1 / LA.norm(np.copy(B[:, i]))
-        if i > 2:
-            pai = [0, 0, 0, 2, 1, 0]
-            l = LA.norm(B[0:3,i])
-            a = np.dot(ads_pos[0,:], pa[:,pai[i]])
-            c = LA.norm(ads_pos[0,:])
-            r = np.sqrt(c**2-a**2)
-            d_theta = l / r
-            B[:,i] *= 1 / d_theta
-            print(l / r)
     return B
-
-def get_rot_vec(ads_pos, pa):
-    vec = np.cross(ads_pos, pa)
-    c = LA.norm(ads_pos)
-    a = np.dot(ads_pos, pa)
-    b = np.sqrt(c**2 - a**2)
-    scale = b / LA.norm(vec)
-    vec *= scale
-    return vec
-
 
 def bootstrap_points(AdTherm, atoms, coord):
     force_all = atoms.calc.results['forces']
@@ -83,8 +63,7 @@ def bootstrap_points(AdTherm, atoms, coord):
         y[2 * i+1] = E + 0.5 * dE[i]
     return x, y
 
-def map_coords_to_min0(AdTherm, atoms):
-    coord = np.zeros(AdTherm.ndim)
+def map_rotation_to_min0(AdTherm, atoms):
     ref_ads = AdTherm.adsorbates[0].copy()
     ref_com = AdTherm.coms[0,:]
     ref_pa =  np.transpose(ref_ads.get_moments_of_inertia(vectors=True)[1])
@@ -97,14 +76,23 @@ def map_coords_to_min0(AdTherm, atoms):
     for i in range(len(ads)):
         ref_overlap = np.matmul(ref_pos[i,:],ref_pa)
         overlap =  np.matmul(pos[i,:],pa) 
+        #print('overlap: ',overlap)
         if np.min(np.abs(overlap)) >= 0.01:
             break
 
     for i in range(3):
         ref_sign = np.sign(ref_overlap[i])
         sign = np.sign(overlap[i])
-        if ref_sign != sign:
+        if ref_sign != sign and overlap[i] >= 0.01:
             pa[:,i] *= -1
+    
+    cross_ref = np.cross(ref_pa[:,0],ref_pa[:,1])
+    ref_sign = np.sign(np.dot(cross_ref,ref_pa[:,2]))
+    cross = np.cross(pa[:,0],pa[:,1])
+    sign = np.sign(np.dot(cross,pa[:,2]))
+    if sign != ref_sign:
+        pa[:,2] *= -1
+
     A_solve = np.matmul(ref_pa.T, pa).flatten()
     
     def f(x):
@@ -136,7 +124,5 @@ def map_coords_to_min0(AdTherm, atoms):
                         bounds=([-np.pi, -np.pi, -1e-8],
                                 [np.pi, np.pi, 1e-8]))
 
-    coord[0:3] = com
-    if AdTherm.ndim > 3:
-        coord[3::] = x.x[0:AdTherm.ndim-3]
-    return coord    
+    rot_coord = x.x[0:AdTherm.ndim-3]
+    return rot_coord    

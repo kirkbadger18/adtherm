@@ -1,6 +1,6 @@
 import numpy as np
 from functions import *
-from generate import coord_generate 
+from generate import * 
 
 
 class AdTherm:
@@ -9,7 +9,7 @@ class AdTherm:
                  minima,
                  indices,
                  hessians_3N = None,
-                 dz_limits= [-1, 5]):
+                 dz_limits= [-0.5, 2]):
 
         self.minima = minima
         self.indices = indices
@@ -19,6 +19,7 @@ class AdTherm:
         self._assess_degrees_of_freedom()
         self._get_minima_information()
         self._set_domain_limits()
+        self._remap_minima_into_cell()
  
     def _set_domain_limits(self):
 
@@ -43,9 +44,9 @@ class AdTherm:
             self.rigid_hessians.append(h)
             self.coms[i,:] = ads.get_center_of_mass()
             self.minima_coords[i,0:3] = self.coms[i,:]
-            self.E_min[i] = minimum.calc.results['energy'] #get_potential_energy()
-            if i != 0:
-                self.minima_coords[i,:] = map_coords_to_min0(self, minimum)
+            self.E_min[i] = minimum.calc.results['energy']
+            if i != 0 and self.rotate:
+                self.minima_coords[i,3::] = map_rotation_to_min0(self, minimum)
 
     def _assess_degrees_of_freedom(self):
         self.N_atoms_in_adsorbate = len(self.indices)
@@ -57,6 +58,17 @@ class AdTherm:
             self.ndim = 3
             self.rotate = False
 
+    def _remap_minima_into_cell(self):
+        from ase.io import Trajectory
+        mintraj = Trajectory('min.traj','w')
+        for k in range(len(self.minima)):
+            coord = self.minima_coords[k,:]
+            valid, location = check_coord(self, coord)
+            if valid and location == 'outside':
+                coord, location = move_inside(self, coord)
+            self.minima_coords[k,:] = coord
+            mintraj.write(self.minima[k], energy= float(self.E_min[k]))
+        print(self.minima_coords)
 ################ add function t get rhombus info   ##################
 
     def generate_gauss_points(self, n_gauss, temperature):
@@ -87,7 +99,7 @@ class AdTherm:
 
         for j in range(len(coords)):
             coord = coords[j]
-            np.savetxt(fnames[j], coord)
+            np.savetxt(fnames[j], coord, '%1.5e')
 
     def write_y_train(self, dft_lists, fnames):
 
