@@ -11,9 +11,9 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
     while Iter < N_values:
         coord = np.zeros(AdTherm.ndim)
         if method == 'gauss':
-            gaussmean = np.zeros(AdTherm.ndim)
-            #gaussmean =  minima_coords[k,:]
-            gaussmean[0:3] = AdTherm.coms[k,:]
+            #gaussmean = np.zeros(AdTherm.ndim)
+            gaussmean =  AdTherm.minima_coords[k,:]
+            #gaussmean[0:3] = AdTherm.coms[k,:]
             hess = AdTherm.rigid_hessians[k]
             gausscov = AdTherm.scale_gauss * LA.inv(hess)
             rand = np.random.multivariate_normal(
@@ -76,14 +76,14 @@ def check_coord(AdTherm, coord):
         location = 'outside'
     if coord[1] > y_ub or coord[1] < y_lb:
         location = 'outside'
-    if AdTherm.ndim >= 5:    
-        if coord[3] > np.pi or coord[3] < -np.pi:
-            location = 'outside'
-        if coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
-            location = 'outside'
-    if AdTherm.ndim == 6:
-        if coord[5] > np.pi or coord[5] < -np.pi:
-            location = 'outside'
+    #if AdTherm.ndim >= 5:    
+    #    if coord[3] > np.pi or coord[3] < -np.pi:
+    #        location = 'outside'
+    #    if coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
+    #        location = 'outside'
+    #if AdTherm.ndim == 6:
+    #    if coord[5] > np.pi or coord[5] < -np.pi:
+    #        location = 'outside'
     return valid, location
 
 def move_inside(AdTherm, coord):
@@ -136,15 +136,28 @@ def move_inside(AdTherm, coord):
         return coord, location
 
 def manipulate_atoms(AdTherm, coord, k):
+    ''' Need to fix so that rotation to position by a,b, happens'''
     conv = 180 / np.pi
-    pa = AdTherm.adsorbates[k].get_moments_of_inertia(vectors=True)[1].T
-    atoms = AdTherm.minima[k].copy()
+    pa = AdTherm.adsorbates[0].get_moments_of_inertia(vectors=True)[1].T
+    atoms = AdTherm.minima[0].copy()
     adsorbate = AdTherm.adsorbates[k].copy()
+    com_pos = adsorbate.positions - AdTherm.coms[k,:]
+    pa_pos = np.matmul(pa.T,com_pos.T).T 
     if AdTherm.rotate:
-        adsorbate.rotate(conv * coord[3], pa[:, 2], 'COM')
-        adsorbate.rotate(conv * coord[4], pa[:, 1], 'COM')
+        alpha, beta = coord[3:5]
+        alpha0, beta0 = AdTherm.minima_coords[0,3:5]
+        gamma0 = 0
+        gamma = 0
         if AdTherm.ndim == 6:
-            adsorbate.rotate(conv * coord[5], pa[:, 0], 'COM')
-    adsorbate.translate(coord[0:3] - AdTherm.coms[k])
-    atoms.positions[AdTherm.indices] = adsorbate.positions
+            gamma = coord[5]
+            gamma = AdTherm.minima_coords[0,5]
+        R = get_R(alpha, beta, gamma)
+        R0 = get_R(alpha0, beta0, gamma0)
+        invR0 = LA.inv(R0)
+        new_pa_pos = np.matmul(R, np.matmul(invR0, pa_pos.T)).T
+        com_pos = np.matmul(pa,new_pa_pos.T).T
+
+    dx = coord[0:3]
+    new_pos = com_pos + dx
+    atoms.positions[AdTherm.indices] = new_pos
     return atoms

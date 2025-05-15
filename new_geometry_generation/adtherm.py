@@ -1,7 +1,7 @@
 import numpy as np
 from functions import *
 from generate import * 
-
+from ase import Atom
 
 class AdTherm:
 
@@ -29,6 +29,7 @@ class AdTherm:
         self.unit_cell_y = self.minima[0].get_cell_lengths_and_angles()[1]
         self.min_atomic_distance = 0.2
         self.max_atomic_distance = 100
+        return
 
     def _get_minima_information(self):
 
@@ -40,13 +41,15 @@ class AdTherm:
         for i, minimum in enumerate(self.minima):
             ads = minimum[self.indices].copy()
             self.adsorbates.append(ads)
-            h = project_to_rigid_hessian(self, self.hessians_3N[i], minimum)
-            self.rigid_hessians.append(h)
             self.coms[i,:] = ads.get_center_of_mass()
             self.minima_coords[i,0:3] = self.coms[i,:]
             self.E_min[i] = minimum.calc.results['energy']
             if i != 0 and self.rotate:
                 self.minima_coords[i,3::] = map_rotation_to_min0(self, minimum)
+            h = project_to_rigid_hessian(self, self.hessians_3N[i], self.minima_coords[i,3::])
+            self.rigid_hessians.append(h)
+
+        return
 
     def _assess_degrees_of_freedom(self):
         self.N_atoms_in_adsorbate = len(self.indices)
@@ -57,7 +60,8 @@ class AdTherm:
         elif self.N_atoms_in_adsorbate == 1:
             self.ndim = 3
             self.rotate = False
-
+        return
+           
     def _remap_minima_into_cell(self):
         from ase.io import Trajectory
         mintraj = Trajectory('min.traj','w')
@@ -68,7 +72,8 @@ class AdTherm:
                 coord, location = move_inside(self, coord)
             self.minima_coords[k,:] = coord
             mintraj.write(self.minima[k], energy= float(self.E_min[k]))
-        print(self.minima_coords)
+        #print(self.minima_coords)
+
 ################ add function t get rhombus info   ##################
 
     def generate_gauss_points(self, n_gauss, temperature):
@@ -126,11 +131,10 @@ class AdTherm:
                 else:
                     x = np.vstack((x,xi))
                     y = np.vstack((y,yi))
-        np.savetxt(namelist[0], x)
-        np.savetxt(namelist[1], y)
+        np.savetxt(namelist[0], x, '%1.5e')
+        np.savetxt(namelist[1], y, '%1.5e')
 
     def write_minima_info(self, namelist):
         np.savetxt(namelist[0], self.minima_coords)
         np.savetxt(namelist[1], self.E_min)
-
- 
+       
