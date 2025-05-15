@@ -91,9 +91,9 @@ def get_external_basis(AdTherm, rot_coords):
     dRdalpha = get_dRdalpha(alpha, beta, gamma)
     dRdbeta = get_dRdbeta(alpha, beta, gamma)
     dRdgamma = get_dRdgamma(alpha, beta, gamma)
-    dxdalpha = np.matmul(dRdalpha,pa_pos.T).T
-    dxdbeta = np.matmul(dRdbeta,pa_pos.T).T
-    dxdgamma = np.matmul(dRdgamma,pa_pos.T).T
+    dxdalpha = np.matmul(pa,np.matmul(dRdalpha,pa_pos.T)).T
+    dxdbeta = np.matmul(pa,np.matmul(dRdbeta,pa_pos.T)).T
+    dxdgamma = np.matmul(pa,np.matmul(dRdgamma,pa_pos.T)).T
     for i in range(len(AdTherm.indices)):
         B[3*i, 0] = 1
         B[3*i+1, 1] = 1
@@ -112,8 +112,6 @@ def bootstrap_points(AdTherm, atoms, coord):
     dx = 1e-2
     rot_coords = coord[3::]
     B = get_external_basis(AdTherm, rot_coords)
-    for i in range(np.shape(B)[1]):
-        B[:,i] *= (1 / LA.norm(B[:,i]))
     g_sub = -1 * np.matmul(np.transpose(B), force)
     dE = dx * g_sub
     x = np.zeros([2*AdTherm.ndim, AdTherm.ndim])
