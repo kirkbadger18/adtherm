@@ -150,7 +150,7 @@ def manipulate_atoms(AdTherm, coord, k):
         gamma = 0
         if AdTherm.ndim == 6:
             gamma = coord[5]
-            gamma = AdTherm.minima_coords[0,5]
+            gamma0 = AdTherm.minima_coords[0,5]
         R = get_R(alpha, beta, gamma)
         R0 = get_R(alpha0, beta0, gamma0)
         invR0 = LA.inv(R0)
