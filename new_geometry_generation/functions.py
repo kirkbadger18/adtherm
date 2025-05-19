@@ -200,7 +200,7 @@ def map_rotation_to_min0(AdTherm, atoms):
 
     if AdTherm.ndim == 6:
         max_error = 10
-        while max_error > 1e-8:
+        while max_error > 1e-12:
             guess = np.random.rand(3)
             guess[0] = guess[0] * 2 * np.pi - np.pi
             guess[1] = guess[1] * np.pi - np.pi / 2

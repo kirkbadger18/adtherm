@@ -40,41 +40,65 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
                 coord[3:AdTherm.ndim] -= np.pi
                 coord[4] *= 0.5
 
-        valid, location = check_coord(AdTherm, coord)
-        if valid: # and location == 'inside':
+        valid_z, xy_location = check_xyz_coord(AdTherm, coord)
+        if valid_z: # and location == 'inside':
             atoms = manipulate_atoms(AdTherm, coord, k)
-            valid = get_min_max_distance(AdTherm, atoms.positions) 
+            valid_distances = get_min_max_distance(AdTherm, atoms.positions)
 
-        if valid and location == 'outside':
-            coord, location = move_inside(AdTherm, coord)
+        if valid_distances and xy_location == 'outside':
+            coord = move_xy_inside(AdTherm, coord)
 
-        if valid:
+        if valid_distances:
             if method == 'gauss' and minima_index > 0 and AdTherm.rotate:
-                print('before: ', coord[3])
                 coord[3::] = map_rotation_to_min0(AdTherm, atoms) 
-                print('after: ',coord[3])
             coords[Iter, :] = coord
             Iter += 1
             dft_jobs.append(atoms)
 
     return dft_jobs, coords
 
-def check_coord(AdTherm, coord):
-    uc_x = AdTherm.unit_cell_x / 3.0
-    uc_y = AdTherm.unit_cell_y / 3.0
-    y_ub = uc_y
-    y_lb = 0.0
-    x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-    x_lb = coord[1] * (1. / np.sqrt(3))
+def get_ab_from_xy(AdTherm, xy):
+    len_x = AdTherm.unit_cell_x / 3.0
+    len_y = AdTherm.unit_cell_y / 3.0
+    vx = np.array([len_x,0])
+    vy = np.array([0.5 * len_y, np.sqrt(3) * len_y / 2])
+    B = np.zeros([2,2])
+    B[:,0] = vx
+    B[:,1] = vy
+    xy = np.array([xy[0],xy[1]])
+    invB = LA.inv(B)
+    ab = np.matmul(invB,xy)
+    return ab
+
+def get_xy_from_ab(AdTherm, ab):
+    len_x = AdTherm.unit_cell_x / 3.0
+    len_y = AdTherm.unit_cell_y / 3.0
+    vx = np.array([len_x,0])
+    vy = np.array([0.5 * len_y, np.sqrt(3) * len_y / 2])
+    B = np.zeros([2,2])
+    B[:,0] = vx
+    B[:,1] = vy
+    xy = np.matmul(B,ab)
+    return xy
+
+
+def check_xy_coord(AdTherm, coord):
+    #uc_x = AdTherm.unit_cell_x / 3.0
+    #uc_y = AdTherm.unit_cell_y / 3.0
+    #y_ub = uc_y
+    #y_lb = 0.0
+    #x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
+    #x_lb = coord[1] * (1. / np.sqrt(3))
+    ab = get_ab_from_xy(AdTherm, coord[0:2])
     z_ub = AdTherm.z_high
     z_lb = AdTherm.z_low
     valid = True
     location = 'inside'
     if coord[2] > z_ub or coord[2] < z_lb:
         valid = False
-    if coord[0] > x_ub or coord[0] < x_lb:
+    if ab[0] > 1 or ab[0] < 0:
         location = 'outside'
-    if coord[1] > y_ub or coord[1] < y_lb:
+    if ab[1] > 1 or ab[1] < 0:
         location = 'outside'
     #if AdTherm.ndim >= 5:    
     #    if coord[3] > np.pi or coord[3] < -np.pi:
@@ -86,28 +110,37 @@ def check_coord(AdTherm, coord):
     #        location = 'outside'
     return valid, location
 
-def move_inside(AdTherm, coord):
-    uc_x = AdTherm.unit_cell_x / 3.0
-    uc_y = AdTherm.unit_cell_y / 3.0
-    y_ub = uc_y
-    y_lb = 0.0
-    x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-    x_lb = coord[1] * (1. / np.sqrt(3))
+def move_xy_inside(AdTherm, coord):
+    #uc_x = AdTherm.unit_cell_x / 3.0
+    #uc_y = AdTherm.unit_cell_y / 3.0
+    #y_ub = uc_y
+    #y_lb = 0.0
+    #x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
+    #x_lb = coord[1] * (1. / np.sqrt(3))
+    ab = get_ab_from_xy(AdTherm,coord[0:2])
 
-    while coord[1] > y_ub or coord[1] < y_lb:
-        if coord[1] > y_ub:
-            coord[1] -= uc_y
-            coord[0] -= uc_y * (1. / np.sqrt(3))
-        elif coord[1] < y_lb:
-            coord[1] += uc_y
-            coord[0] += uc_y * (1. / np.sqrt(3))
-        x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-        x_lb = coord[1] * (1. / np.sqrt(3))
-    while (coord[0] > x_ub or coord[0] < x_lb):
-        if coord[0] > x_ub:
-            coord[0] -= uc_x
-        elif coord[0] < x_lb:
-            coord[0] += uc_x
+    while ab[0] > 1 or ab[0] < 0:
+        sign = np.sign(ab[0])
+        ab[0] -= sign * 1
+    while ab[1] > 1 or ab[1] < 0:
+        sign = np.sign(ab[1])
+        ab[1] -= sign * 1
+    xy = get_xy_from_ab(AdTherm, ab)
+    coord[0:2] = xy[0:2]
+    #while ab[10] > y_ub or coord[1] < y_lb:
+    #    if coord[1] > y_ub:
+    #        coord[1] -= uc_y
+    #        coord[0] -= uc_y * (1. / np.sqrt(3))
+    #    elif coord[1] < y_lb:
+    #        coord[1] += uc_y
+    #        coord[0] += uc_y * (1. / np.sqrt(3))
+    #    x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
+    #    x_lb = coord[1] * (1. / np.sqrt(3))
+    #while (coord[0] > x_ub or coord[0] < x_lb):
+    #    if coord[0] > x_ub:
+    #        coord[0] -= uc_x
+    #    elif coord[0] < x_lb:
+    #        coord[0] += uc_x
     #if AdTherm.ndim >= 5:
     #    while coord[3] > np.pi or coord[3] < -np.pi:
     #        if coord[3] > np.pi:
@@ -145,16 +178,16 @@ def manipulate_atoms(AdTherm, coord, k):
     pa_pos = np.matmul(pa.T,com_pos.T).T 
     if AdTherm.rotate:
         alpha, beta = coord[3:5]
-        alpha0, beta0 = AdTherm.minima_coords[0,3:5]
+        alpha0, beta0 = AdTherm.minima_coords[k,3:5]
         gamma0 = 0
         gamma = 0
         if AdTherm.ndim == 6:
             gamma = coord[5]
-            gamma0 = AdTherm.minima_coords[0,5]
+            gamma0 = AdTherm.minima_coords[k,5]
         R = get_R(alpha, beta, gamma)
         R0 = get_R(alpha0, beta0, gamma0)
         invR0 = LA.inv(R0)
-        new_pa_pos = np.matmul(R, np.matmul(invR0, pa_pos.T)).T
+        new_pa_pos = np.matmul(R,np.matmul(invR0, pa_pos.T)).T
         com_pos = np.matmul(pa,new_pa_pos.T).T
 
     dx = coord[0:3]

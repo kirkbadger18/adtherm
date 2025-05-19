@@ -25,8 +25,8 @@ class AdTherm:
 
         self.z_low = self.dz_limits[0] + np.min(self.coms[:, 2])
         self.z_high = self.dz_limits[1] + np.max(self.coms[:, 2])
-        self.unit_cell_x = self.minima[0].get_cell_lengths_and_angles()[0]
-        self.unit_cell_y = self.minima[0].get_cell_lengths_and_angles()[1]
+        self.unit_cell_x = self.minima[0].cell.cellpar()[0]
+        self.unit_cell_y = self.minima[0].cell.cellpar()[1]
         self.min_atomic_distance = 0.2
         self.max_atomic_distance = 100
         return
@@ -72,8 +72,7 @@ class AdTherm:
                 coord, location = move_inside(self, coord)
             self.minima_coords[k,:] = coord
             mintraj.write(self.minima[k], energy= float(self.E_min[k]))
-        #print(self.minima_coords)
-
+        
 ################ add function t get rhombus info   ##################
 
     def generate_gauss_points(self, n_gauss, temperature):
