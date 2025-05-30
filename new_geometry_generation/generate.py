@@ -162,11 +162,11 @@ def move_xy_inside(AdTherm, coord):
     #            coord[5] -= 2 * np.pi
     #        if coord[5] < -np.pi:
     #            coord[5] += 2 * np.pi
-    valid, location = check_coord(AdTherm, coord)
-    if not valid or location == 'outside':
+    valid_z, xy_location = check_xy_coord(AdTherm, coord)
+    if not valid_z or xy_location == 'outside':
         raise Exception("move inside function not working")
     else:
-        return coord, location
+        return coord, xy_location
 
 def manipulate_atoms(AdTherm, coord, k):
     ''' Need to fix so that rotation to position by a,b, happens'''

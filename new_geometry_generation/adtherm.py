@@ -37,18 +37,18 @@ class AdTherm:
         self.rigid_hessians = []
         self.coms = np.zeros([len(self.minima),3])
         self.minima_coords = np.zeros([len(self.minima),self.ndim])
-        self.E_min = np.zeros([len(self.minima),1])
+        self.minima_E = np.zeros([len(self.minima),1])
         for i, minimum in enumerate(self.minima):
             ads = minimum[self.indices].copy()
             self.adsorbates.append(ads)
             self.coms[i,:] = ads.get_center_of_mass()
             self.minima_coords[i,0:3] = self.coms[i,:]
-            self.E_min[i] = minimum.calc.results['energy']
+            self.minima_E[i] = minimum.calc.results['energy']
             if i != 0 and self.rotate:
                 self.minima_coords[i,3::] = map_rotation_to_min0(self, minimum)
             h = project_to_rigid_hessian(self, self.hessians_3N[i], self.minima_coords[i,3::])
             self.rigid_hessians.append(h)
-
+        self.E_ref = np.min(self.minima_E)
         return
 
     def _assess_degrees_of_freedom(self):
@@ -67,13 +67,28 @@ class AdTherm:
         mintraj = Trajectory('min.traj','w')
         for k in range(len(self.minima)):
             coord = self.minima_coords[k,:]
-            valid, location = check_coord(self, coord)
-            if valid and location == 'outside':
-                coord, location = move_inside(self, coord)
+            valid_z, xy_location = check_xy_coord(self, coord)
+            if valid_z and xy_location == 'outside':
+                coord, xy_location = move_xy_inside(self, coord)
             self.minima_coords[k,:] = coord
-            mintraj.write(self.minima[k], energy= float(self.E_min[k]))
+            mintraj.write(self.minima[k], energy= float(self.minima_E[k]))
         
 ################ add function t get rhombus info   ##################
+
+    def get_x_train_from_traj(self,traj):
+        coords = np.zeros([len(traj),self.ndim])
+        for i, img in enumerate(traj):
+            coord = np.zeros(self.ndim)
+            ads = img[self.indices].copy()
+            com = ads.get_center_of_mass()
+            coord[0:3] = com
+            if self.rotate:
+                coord[3::] = map_rotation_to_min0(self, img)
+            valid_z, xy_location = check_xy_coord(self, coord)
+            if valid_z and xy_location == 'outside':
+                coord, xy_location = move_xy_inside(self, coord) 
+            coords[i,:] = coord
+        return coords
 
     def generate_gauss_points(self, n_gauss, temperature):
         kb = 8.617E-5
@@ -103,7 +118,7 @@ class AdTherm:
 
         for j in range(len(coords)):
             coord = coords[j]
-            np.savetxt(fnames[j], coord, '%1.5e')
+            np.savetxt(fnames[j], coord, '%1.8e')
 
     def write_y_train(self, dft_lists, fnames):
 
@@ -115,7 +130,7 @@ class AdTherm:
                 E[i] = img.calc.results['energy'] #get_potential_energy()
             np.savetxt(fnames[j], E)
 
-    def evaluate_stencil_points(self, dft_lists, coord_lists, namelist):
+    def evaluate_stencil_points(self, dft_lists, coord_lists, namelist,delta=1e-6):
         
         for i in range(len(dft_lists)):
             dft_list = dft_lists[i]
@@ -123,17 +138,17 @@ class AdTherm:
             for j in range(len(dft_list)):
                 img = dft_list[j]
                 coord = coord_list[j]
-                xi, yi = bootstrap_points(self, img, coord)
+                xi, yi = bootstrap_points(self, img, coord,delta)
                 if i == 0 and j == 0:
                     x = xi
                     y = yi
                 else:
                     x = np.vstack((x,xi))
                     y = np.vstack((y,yi))
-        np.savetxt(namelist[0], x, '%1.5e')
-        np.savetxt(namelist[1], y, '%1.5e')
+        np.savetxt(namelist[0], x, '%1.8e')
+        np.savetxt(namelist[1], y, '%1.8e')
 
     def write_minima_info(self, namelist):
         np.savetxt(namelist[0], self.minima_coords)
-        np.savetxt(namelist[1], self.E_min)
+        np.savetxt(namelist[1], self.minima_E)
        

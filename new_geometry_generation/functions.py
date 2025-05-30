@@ -105,11 +105,12 @@ def get_external_basis(AdTherm, rot_coords):
             B[:, 5] = dxdgamma.reshape(-1)
     return B
 
-def bootstrap_points(AdTherm, atoms, coord):
+def bootstrap_points(AdTherm, atoms, coord,delta):
     force_all = atoms.calc.results['forces']
     force = force_all[AdTherm.indices].reshape(-1)
-    E = atoms.calc.results['energy']
-    dx = 1e-2
+    E = atoms.calc.results['energy'] - AdTherm.E_ref
+    print(E)
+    dx = delta
     rot_coords = coord[3::]
     B = get_external_basis(AdTherm, rot_coords)
     g_sub = -1 * np.matmul(np.transpose(B), force)
