@@ -22,7 +22,6 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
                     size=1,
                     check_valid='warn')
             coord = rand[0]
-    
         if method == 'random' or method == 'sobol':
             if method == 'sobol':
                 coord = i4_sobol_generate(AdTherm.ndim, 1, sobol_n+1)[0, :]
@@ -40,15 +39,15 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
                 coord[3:AdTherm.ndim] -= np.pi
                 coord[4] *= 0.5
 
-        valid_z, xy_location = check_xyz_coord(AdTherm, coord)
-        if valid_z: # and location == 'inside':
+        valid, xy_location = check_xy_coord(AdTherm, coord)
+        if valid: # and location == 'inside':
             atoms = manipulate_atoms(AdTherm, coord, k)
-            valid_distances = get_min_max_distance(AdTherm, atoms.positions)
+            valid = get_min_max_distance(AdTherm, atoms.positions)
 
-        if valid_distances and xy_location == 'outside':
-            coord = move_xy_inside(AdTherm, coord)
+        if valid and xy_location == 'outside':
+            coord, xy_location = move_xy_inside(AdTherm, coord)
 
-        if valid_distances:
+        if valid:
             if method == 'gauss' and minima_index > 0 and AdTherm.rotate:
                 coord[3::] = map_rotation_to_min0(AdTherm, atoms) 
             coords[Iter, :] = coord
