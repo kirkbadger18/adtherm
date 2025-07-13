@@ -13,7 +13,7 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
         if method == 'gauss':
             #gaussmean = np.zeros(AdTherm.ndim)
             gaussmean =  AdTherm.minima_coords[k,:]
-            #gaussmean[0:3] = AdTherm.coms[k,:]
+            gaussmean[0:3] = AdTherm.coms[k,:]
             hess = AdTherm.rigid_hessians[k]
             gausscov = AdTherm.scale_gauss * LA.inv(hess)
             rand = np.random.multivariate_normal(
