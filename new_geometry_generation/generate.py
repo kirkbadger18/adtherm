@@ -111,9 +111,8 @@ def move_xy_inside(AdTherm, coord):
         return coord, xy_location
 
 def manipulate_atoms(AdTherm, coord, k):
-    ''' Need to fix so that rotation to position by a,b, happens'''
     conv = 180 / np.pi
-    pa = AdTherm.adsorbates[0].get_moments_of_inertia(vectors=True)[1].T
+    pa = AdTherm.adsorbates[0].get_moments_of_inertia(vectors=True)[1].T 
     atoms = AdTherm.minima[0].copy()
     adsorbate = AdTherm.adsorbates[k].copy()
     com_pos = adsorbate.positions - AdTherm.coms[k,:]
