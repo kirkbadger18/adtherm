@@ -80,14 +80,7 @@ def get_xy_from_ab(AdTherm, ab):
     xy = np.matmul(B,ab)
     return xy
 
-
 def check_xy_coord(AdTherm, coord):
-    #uc_x = AdTherm.unit_cell_x / 3.0
-    #uc_y = AdTherm.unit_cell_y / 3.0
-    #y_ub = uc_y
-    #y_lb = 0.0
-    #x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-    #x_lb = coord[1] * (1. / np.sqrt(3))
     ab = get_ab_from_xy(AdTherm, coord[0:2])
     z_ub = AdTherm.z_high
     z_lb = AdTherm.z_low
@@ -99,25 +92,10 @@ def check_xy_coord(AdTherm, coord):
         location = 'outside'
     if ab[1] > 1 or ab[1] < 0:
         location = 'outside'
-    #if AdTherm.ndim >= 5:    
-    #    if coord[3] > np.pi or coord[3] < -np.pi:
-    #        location = 'outside'
-    #    if coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
-    #        location = 'outside'
-    #if AdTherm.ndim == 6:
-    #    if coord[5] > np.pi or coord[5] < -np.pi:
-    #        location = 'outside'
     return valid, location
 
 def move_xy_inside(AdTherm, coord):
-    #uc_x = AdTherm.unit_cell_x / 3.0
-    #uc_y = AdTherm.unit_cell_y / 3.0
-    #y_ub = uc_y
-    #y_lb = 0.0
-    #x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-    #x_lb = coord[1] * (1. / np.sqrt(3))
     ab = get_ab_from_xy(AdTherm,coord[0:2])
-
     while ab[0] > 1 or ab[0] < 0:
         sign = np.sign(ab[0])
         ab[0] -= sign * 1
@@ -126,41 +104,6 @@ def move_xy_inside(AdTherm, coord):
         ab[1] -= sign * 1
     xy = get_xy_from_ab(AdTherm, ab)
     coord[0:2] = xy[0:2]
-    #while ab[10] > y_ub or coord[1] < y_lb:
-    #    if coord[1] > y_ub:
-    #        coord[1] -= uc_y
-    #        coord[0] -= uc_y * (1. / np.sqrt(3))
-    #    elif coord[1] < y_lb:
-    #        coord[1] += uc_y
-    #        coord[0] += uc_y * (1. / np.sqrt(3))
-    #    x_ub = uc_x + coord[1] * (1. / np.sqrt(3))
-    #    x_lb = coord[1] * (1. / np.sqrt(3))
-    #while (coord[0] > x_ub or coord[0] < x_lb):
-    #    if coord[0] > x_ub:
-    #        coord[0] -= uc_x
-    #    elif coord[0] < x_lb:
-    #        coord[0] += uc_x
-    #if AdTherm.ndim >= 5:
-    #    while coord[3] > np.pi or coord[3] < -np.pi:
-    #        if coord[3] > np.pi:
-    #            coord[3] -= 2 * np.pi
-    #        if coord[3] < -np.pi:
-    #            coord[3] += 2 * np.pi
-    #    while coord[4] > 0.5 * np.pi or coord[4] < -0.5 * np.pi:
-    #        if coord[4] > 0.5 * np.pi:
-    #            coord[4] -= np.pi
-    #            sign = np.sign(coord[3])
-    #            coord[3] = sign * (np.pi - np.abs(coord[3]))
-    #        if coord[4] < -0.5 * np.pi:
-    #            coord[4] += np.pi
-    #            sign = np.sign(coord[3])
-    #            coord[3] = sign * (np.pi - np.abs(coord[3]))
-    #if AdTherm.ndim == 6:
-    #    while coord[5] > np.pi or coord[5] < -np.pi:
-    #        if coord[5] > np.pi:
-    #            coord[5] -= 2 * np.pi
-    #        if coord[5] < -np.pi:
-    #            coord[5] += 2 * np.pi
     valid_z, xy_location = check_xy_coord(AdTherm, coord)
     if not valid_z or xy_location == 'outside':
         raise Exception("move inside function not working")

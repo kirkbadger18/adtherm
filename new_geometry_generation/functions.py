@@ -21,41 +21,42 @@ def get_min_max_distance(AdTherm, pos):
             valid = False
         return valid
 
-def get_R_pa0(alpha):
-    R_pa_0 = np.array(((np.cos(alpha), -np.sin(alpha), 0),
-                        (np.sin(alpha), np.cos(alpha), 0),
+def get_R_pa2(beta):
+    R_pa_2 = np.array(((np.cos(beta), -np.sin(beta), 0),
+                        (np.sin(beta), np.cos(beta), 0),
                         (0, 0, 1)))
-    return R_pa_0
+    return R_pa_2
+
+
 def get_R_pa1(gamma):
     R_pa_1 = np.array(((np.cos(gamma), 0, np.sin(gamma)),
                       (0, 1, 0),
                       (-np.sin(gamma), 0, np.cos(gamma))))
     return R_pa_1
 
-def get_R_pa2(beta):
-    R_pa_2 = np.array(((1, 0, 0),
-                      (0, np.cos(beta), -np.sin(beta)),
-                      (0, np.sin(beta), np.cos(beta))))
-    return R_pa_2
-
-def get_dRdalpha(alpha, beta, gamma):
-    R0 = np.array(((-np.sin(alpha), -np.cos(alpha), 0),
-                        (np.cos(alpha), -np.sin(alpha), 0),
-                        (0, 0, 0)))
-
-    R1 = get_R_pa1(gamma)
-    R2 = get_R_pa2(beta)
-    dRdalpha = np.matmul(np.matmul(R1,R2), R0)
-    return dRdalpha
+def get_R_pa0(alpha):
+    R_pa_0 = np.array(((1, 0, 0),
+                      (0, np.cos(alpha), -np.sin(alpha)),
+                      (0, np.sin(alpha), np.cos(alpha))))
+    return R_pa_0
 
 def get_dRdbeta(alpha, beta, gamma):
     R0 = get_R_pa0(alpha)
     R1 = get_R_pa1(gamma)
-    R2 = np.array(((0, 0, 0),
-                      (0, -np.sin(beta), -np.cos(beta)),
-                      (0, np.cos(beta), -np.sin(beta))))
+    R2 = np.array(((-np.sin(beta), -np.cos(beta), 0),
+                    (np.cos(beta), -np.sin(beta), 0),
+                    (0, 0, 0)))
     dRdbeta = np.matmul(np.matmul(R1,R2), R0)
     return dRdbeta
+
+def get_dRdalpha(alpha, beta, gamma):
+    R0 = np.array(((0, 0, 0),
+                    (0, -np.sin(alpha), -np.cos(alpha)),
+                    (0, np.cos(alpha), -np.sin(alpha))))
+    R1 = get_R_pa1(gamma)
+    R2 = get_R_pa2(beta)
+    dRdalpha = np.matmul(np.matmul(R1,R2), R0)
+    return dRdalpha
 
 def get_dRdgamma(alpha, beta, gamma):
     R0 = get_R_pa0(alpha)
@@ -65,6 +66,7 @@ def get_dRdgamma(alpha, beta, gamma):
     R2 = get_R_pa2(beta)
     dRdgamma = np.matmul(np.matmul(R1,R2), R0)
     return dRdgamma
+
 
 def get_R(alpha, beta, gamma):
     R0 = get_R_pa0(alpha)
@@ -76,8 +78,6 @@ def get_R(alpha, beta, gamma):
 def project_to_rigid_hessian(AdTherm, H, rot_coords):
     B = get_external_basis(AdTherm, rot_coords)
     H_sub = np.matmul(B.T,np.matmul(H,B))
-    print(H_sub.round(3))
-    print('eig are: ', LA.eigh(H_sub)[0])
     return H_sub
 
 def get_external_basis(AdTherm, rot_coords):
@@ -100,7 +100,7 @@ def get_external_basis(AdTherm, rot_coords):
         B[3*i+2, 2] = 1
     if AdTherm.ndim > 3:
         B[:, 3] = dxdalpha.reshape(-1)
-        B[:, 4] = dxdbeta.reshape(-1)
+        B[:, 4] =  dxdbeta.reshape(-1)
         if AdTherm.ndim > 5:
             B[:, 5] = dxdgamma.reshape(-1)
     return B
@@ -181,17 +181,6 @@ def map_rotation_to_min0(AdTherm, atoms):
 
     def f(x):
         alpha, beta, gamma = x
-        #R_pa_0 = np.array(((np.cos(x0), -np.sin(x0), 0), # rotation about first axis
-        #            (np.sin(x0), np.cos(x0), 0),
-        #            (0, 0, 1)))
-        #R_pa_1 = np.array(((np.cos(x2), 0, np.sin(x2)),  #rotation about second axis
-        #              (0, 1, 0),
-        #              (-np.sin(x2), 0, np.cos(x2))))
-        #R_pa_2 = np.array(((1, 0, 0),
-        #              (0, np.cos(x1), -np.sin(x1)), # rotation about third axis
-        #              (0, np.sin(x1), np.cos(x1))))
-        #A = np.dot(np.dot(R_pa_1,R_pa_2), R_pa_0)
-        #'''choosing to rotate about longest axis second to minimize odds of gimble lock'''
         R = get_R(alpha, beta, gamma)
         A = R.flatten()
         return A
@@ -223,4 +212,23 @@ def map_rotation_to_min0(AdTherm, atoms):
                                 [np.pi, np.pi, 1e-8]))
  
     rot_coord = x.x[0:AdTherm.ndim-3]
-    return rot_coord    
+    return rot_coord
+
+
+def generate_symmetric_hessians(AdTherm, H_list):
+    sym_num =  AdTherm.surface_symmetry_number
+    sym_H = []
+    for H in H_list:
+        for j in range(sym_num-1):
+            angle = (j + 1) * 2 * np.pi / sym_num
+            eig, vecs = LA.eigh(H)
+            rot_vecs = np.zeros(np.shape(vecs))
+            for k in range(len(eig)):
+                vec = vecs[:,k].reshape(-1,3).copy()
+                R = get_R_pa2(angle)
+                rot_vec = np.matmul(R,vec.T).T
+                rot_vecs[:,k] = rot_vec.reshape(-1)
+            rot_H = np.matmul(rot_vecs,np.matmul(np.diag(eig),LA.inv(rot_vecs)))
+            sym_H.append(rot_H)
+    return sym_H
+

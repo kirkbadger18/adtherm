@@ -9,17 +9,23 @@ class AdTherm:
                  minima,
                  indices,
                  hessians_3N = None,
-                 dz_limits= [-0.5, 2]):
+                 dz_limits= [-0.5, 2],
+                 generate_symmetric_minima = False,
+                 surface_symmetry_number = None):
 
         self.minima = minima
         self.indices = indices
         self.hessians_3N = hessians_3N
         self.dz_limits = dz_limits
-        
+        self.generate_symmetric_minima = generate_symmetric_minima
+        self.surface_symmetry_number = surface_symmetry_number
+
         self._assess_degrees_of_freedom()
         self._get_minima_information()
         self._set_domain_limits()
         self._remap_minima_into_cell()
+        if self.generate_symmetric_minima and self.surface_symmetry_number:
+            self._generate_symmetric_minima()
  
     def _set_domain_limits(self):
 
@@ -72,8 +78,25 @@ class AdTherm:
                 coord, xy_location = move_xy_inside(self, coord)
             self.minima_coords[k,:] = coord
             mintraj.write(self.minima[k], energy= float(self.minima_E[k]))
-        
-################ add function t get rhombus info   ##################
+
+    def _generate_symmetric_minima(self):
+        x = self.minima_coords
+        y = self.minima_E 
+        x_sym, y_sym = self.generate_symmetric_coords(x,y)
+        self.symmetric_minima_coords = x_sym
+        self.symmetric_minima_E = y_sym
+        H_sym_3N = generate_symmetric_hessians(self,self.hessians_3N)
+        H_sym_rigid = []
+        for i in range(len(H_sym_3N)):
+            h = project_to_rigid_hessian(self, H_sym_3N[i], x_sym[i,3::])
+            H_sym_rigid.append(h)
+        self.symmetric_rigid_hessians = H_sym_rigid
+        from ase.io import Trajectory
+        symtraj = Trajectory('sym.traj','w')
+        for coord in self.symmetric_minima_coords:
+            atoms = manipulate_atoms(self, coord, 0)
+            symtraj.write(atoms)
+        return
 
     def get_x_train_from_traj(self,traj):
         coords = np.zeros([len(traj),self.ndim])
@@ -114,14 +137,27 @@ class AdTherm:
         dft_list, rigid_coords = coord_generate(self, 'random', n)
         return dft_list, rigid_coords
 
-    def write_x_train(self, coords, fnames):
+    def generate_symmetric_coords(self,x_train,y_train):
+        sym_num = self.surface_symmetry_number 
+        sym_x = np.zeros([(sym_num-1)*len(y_train),6])
+        sym_y = np.zeros((sym_num-1)*len(y_train))
+        conv = 180 / np.pi
+        for i, coord in enumerate(x_train):
+            for j in range(sym_num-1):
+                angle = conv * (j+1) * 2 * np.pi / sym_num
+                atoms = manipulate_atoms(self, coord, 0)
+                atoms.rotate(angle,'z')
+                sym_x[(sym_num-1)*i+j,:] = self.get_x_train_from_traj([atoms])
+                sym_y[(sym_num-1)*i+j] = y_train[i]
+        return sym_x, sym_y
 
+    def write_x_train(self, coords, fnames):
         for j in range(len(coords)):
             coord = coords[j]
             np.savetxt(fnames[j], coord, '%1.8e')
+        return
 
     def write_y_train(self, dft_lists, fnames):
-
         for j in range(len(dft_lists)):
             dft_list = dft_lists[j]
             E = np.zeros(len(dft_list))
@@ -129,9 +165,9 @@ class AdTherm:
                 img = dft_list[i]
                 E[i] = img.calc.results['energy'] #get_potential_energy()
             np.savetxt(fnames[j], E)
+        return
 
     def evaluate_stencil_points(self, dft_lists, coord_lists, namelist,delta=1e-6):
-        
         for i in range(len(dft_lists)):
             dft_list = dft_lists[i]
             coord_list = coord_lists[i]
@@ -147,8 +183,16 @@ class AdTherm:
                     y = np.vstack((y,yi))
         np.savetxt(namelist[0], x, '%1.8e')
         np.savetxt(namelist[1], y, '%1.8e')
+        return
 
+    def write_symmetric_train(self,x_train,y_train):
+        sym_num = self.surface_symmetry_number 
+        sym_x, sym_y = self.generate_symmetric_coords(x_train, y_train)
+        np.savetxt('sym_x_train.dat', sym_x, '%1.8e')
+        np.savetxt('sym_y_train.dat', sym_y, '%1.8e')
+        return
+    
     def write_minima_info(self, namelist):
         np.savetxt(namelist[0], self.minima_coords)
         np.savetxt(namelist[1], self.minima_E)
-       
+        return
