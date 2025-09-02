@@ -29,9 +29,9 @@ def get_R_pa2(beta):
 
 
 def get_R_pa1(gamma):
-    R_pa_1 = np.array(((np.cos(gamma), 0, np.sin(gamma)),
+    R_pa_1 = np.array(((np.cos(gamma), 0, -np.sin(gamma)),
                       (0, 1, 0),
-                      (-np.sin(gamma), 0, np.cos(gamma))))
+                      (np.sin(gamma), 0, np.cos(gamma))))
     return R_pa_1
 
 def get_R_pa0(alpha):
@@ -60,9 +60,9 @@ def get_dRdalpha(alpha, beta, gamma):
 
 def get_dRdgamma(alpha, beta, gamma):
     R0 = get_R_pa0(alpha)
-    R1 = np.array(((-np.sin(gamma), 0, np.cos(gamma)),
+    R1 = np.array(((-np.sin(gamma), 0, -np.cos(gamma)),
                       (0, 0, 0),
-                      (-np.cos(gamma), 0, -np.sin(gamma))))
+                      (np.cos(gamma), 0, -np.sin(gamma))))
     R2 = get_R_pa2(beta)
     dRdgamma = np.matmul(np.matmul(R1,R2), R0)
     return dRdgamma
