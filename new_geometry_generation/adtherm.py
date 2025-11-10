@@ -77,7 +77,10 @@ class AdTherm:
             if valid_z and xy_location == 'outside':
                 coord, xy_location = move_xy_inside(self, coord)
             self.minima_coords[k,:] = coord
-            mintraj.write(self.minima[k], energy= float(self.minima_E[k]))
+        for coord in self.minima_coords:
+            atoms = manipulate_atoms(self, coord, 0)
+            mintraj.write(atoms)
+        return
 
     def _generate_symmetric_minima(self):
         x = self.minima_coords
@@ -143,6 +146,7 @@ class AdTherm:
         sym_y = np.zeros((sym_num-1)*len(y_train))
         conv = 180 / np.pi
         for i, coord in enumerate(x_train):
+            print('Percent done: ', 100 * i / len(y_train))
             for j in range(sym_num-1):
                 angle = conv * (j+1) * 2 * np.pi / sym_num
                 atoms = manipulate_atoms(self, coord, 0)
@@ -150,6 +154,22 @@ class AdTherm:
                 sym_x[(sym_num-1)*i+j,:] = self.get_x_train_from_traj([atoms])
                 sym_y[(sym_num-1)*i+j] = y_train[i]
         return sym_x, sym_y
+
+    def generate_stencil_train(self, dft_lists, coord_lists,delta=1e-6):
+        for i in range(len(dft_lists)):
+            dft_list = dft_lists[i]
+            coord_list = coord_lists[i]
+            for j in range(len(dft_list)):
+                img = dft_list[j]
+                coord = coord_list[j]
+                xi, yi = bootstrap_points(self, img, coord,delta)
+                if i == 0 and j == 0:
+                    x = xi
+                    y = yi
+                else:
+                    x = np.vstack((x,xi))
+                    y = np.vstack((y,yi))
+        return x, y
 
     def write_x_train(self, coords, fnames):
         for j in range(len(coords)):
@@ -167,7 +187,7 @@ class AdTherm:
             np.savetxt(fnames[j], E)
         return
 
-    def evaluate_stencil_points(self, dft_lists, coord_lists, namelist,delta=1e-6):
+    def write_stencil_train(self, dft_lists, coord_lists, namelist,delta=1e-6):
         for i in range(len(dft_lists)):
             dft_list = dft_lists[i]
             coord_list = coord_lists[i]
