@@ -2,13 +2,14 @@ import numpy as np
 from functions import * 
 from sobol_seq import i4_sobol_generate
 
-def coord_generate(AdTherm, method, N_values, minima_index=0):
+def coord_generate(AdTherm, method, N_values, minima_index=0, seed=1):
     dft_jobs = []
     k = minima_index
     coords = np.zeros([N_values, AdTherm.ndim])
     Iter = 0
     sobol_n = 0
     while Iter < N_values:
+        print(Iter)
         coord = np.zeros(AdTherm.ndim)
         if method == 'gauss':
             #gaussmean = np.zeros(AdTherm.ndim)
@@ -24,7 +25,7 @@ def coord_generate(AdTherm, method, N_values, minima_index=0):
             coord = rand[0]
         if method == 'random' or method == 'sobol':
             if method == 'sobol':
-                coord = i4_sobol_generate(AdTherm.ndim, 1, sobol_n+1)[0, :]
+                coord = i4_sobol_generate(AdTherm.ndim, 1, sobol_n+1+seed)[0, :]
                 sobol_n += 1
             if method == 'random':
                 coord = np.random.uniform(0, 1, size=AdTherm.ndim)
@@ -112,25 +113,26 @@ def move_xy_inside(AdTherm, coord):
 
 def manipulate_atoms(AdTherm, coord, k):
     conv = 180 / np.pi
-    pa = AdTherm.adsorbates[0].get_moments_of_inertia(vectors=True)[1].T 
+    pa = AdTherm.adsorbates[0].get_moments_of_inertia(vectors=True)[1].T  
     atoms = AdTherm.minima[0].copy()
     adsorbate = AdTherm.adsorbates[k].copy()
+    ref_pa, pa = get_referenced_principle_axis(AdTherm, AdTherm.adsorbates[0]) 
     com_pos = adsorbate.positions - AdTherm.coms[k,:]
     pa_pos = np.matmul(pa.T,com_pos.T).T 
     if AdTherm.rotate:
-        alpha, beta = coord[3:5]
-        alpha0, beta0 = AdTherm.minima_coords[k,3:5]
-        gamma0 = 0
-        gamma = 0
         if AdTherm.ndim == 6:
-            gamma = coord[5]
-            gamma0 = AdTherm.minima_coords[k,5]
+            alpha, beta, gamma = coord[3:6]
+            alpha0, beta0, gamma0 = AdTherm.minima_coords[k,3:6]
+        if AdTherm.ndim == 5:
+            beta, gamma = coord[3:5]
+            beta0, gamma0 = AdTherm.minima_coords[k,3:5]
+            alpha, alpha0 = 0, 0
+
         R = get_R(alpha, beta, gamma)
         R0 = get_R(alpha0, beta0, gamma0)
         invR0 = LA.inv(R0)
         new_pa_pos = np.matmul(R,np.matmul(invR0, pa_pos.T)).T
         com_pos = np.matmul(pa,new_pa_pos.T).T
-
     dx = coord[0:3]
     new_pos = com_pos + dx
     atoms.positions[AdTherm.indices] = new_pos

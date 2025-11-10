@@ -75,34 +75,44 @@ def get_R(alpha, beta, gamma):
     R = np.matmul(np.matmul(R1,R2), R0)
     return R
 
-def project_to_rigid_hessian(AdTherm, H, rot_coords):
-    B = get_external_basis(AdTherm, rot_coords)
+def project_to_rigid_hessian(AdTherm, H, coords):
+    B = get_external_basis(AdTherm, coords)
     H_sub = np.matmul(B.T,np.matmul(H,B))
     return H_sub
 
-def get_external_basis(AdTherm, rot_coords):
-    ads = AdTherm.adsorbates[0].copy()
-    com = ads.get_center_of_mass()
-    pa = ads.get_moments_of_inertia(vectors=True)[1].T
-    com_pos = ads.positions - com
-    pa_pos = np.matmul(pa.T,com_pos.T).T
-    alpha, beta, gamma = rot_coords
+def get_external_basis(AdTherm, coords):
+    
     B = np.zeros([3 * len(AdTherm.indices), AdTherm.ndim])
-    dRdalpha = get_dRdalpha(alpha, beta, gamma)
-    dRdbeta = get_dRdbeta(alpha, beta, gamma)
-    dRdgamma = get_dRdgamma(alpha, beta, gamma)
-    dxdalpha = np.matmul(pa,np.matmul(dRdalpha,pa_pos.T)).T
-    dxdbeta = np.matmul(pa,np.matmul(dRdbeta,pa_pos.T)).T
-    dxdgamma = np.matmul(pa,np.matmul(dRdgamma,pa_pos.T)).T
     for i in range(len(AdTherm.indices)):
         B[3*i, 0] = 1
         B[3*i+1, 1] = 1
         B[3*i+2, 2] = 1
-    if AdTherm.ndim > 3:
-        B[:, 3] = dxdalpha.reshape(-1)
-        B[:, 4] =  dxdbeta.reshape(-1)
+
+    if AdTherm.rotate:
+        ads = AdTherm.adsorbates[0].copy()
+        com = ads.get_center_of_mass()
+        pa = ads.get_moments_of_inertia(vectors=True)[1].T
+        com_pos = ads.positions - com
+        pa_pos = np.matmul(pa.T,com_pos.T).T
+        if AdTherm.ndim == 6:
+            alpha, beta, gamma = coords[3:6]
+        if AdTherm.ndim == 5:
+            beta, gamma = coords[3:5]
+            alpha = 0
+        dRdalpha = get_dRdalpha(alpha, beta, gamma)
+        dRdbeta = get_dRdbeta(alpha, beta, gamma)
+        dRdgamma = get_dRdgamma(alpha, beta, gamma)
+        dxdalpha = np.matmul(pa,np.matmul(dRdalpha,pa_pos.T)).T
+        dxdbeta = np.matmul(pa,np.matmul(dRdbeta,pa_pos.T)).T
+        dxdgamma = np.matmul(pa,np.matmul(dRdgamma,pa_pos.T)).T
+   
+        B[:, 3] = dxdbeta.reshape(-1)
+        B[:, 4] =  dxdgamma.reshape(-1)
         if AdTherm.ndim > 5:
+            B[:, 3] = dxdalpha.reshape(-1)
+            B[:, 4] =  dxdbeta.reshape(-1)
             B[:, 5] = dxdgamma.reshape(-1)
+
     return B
 
 def bootstrap_points(AdTherm, atoms, coord,delta):
@@ -139,12 +149,11 @@ def get_referenced_principle_axis(AdTherm,ads):
     max_idx = np.zeros(3)
     max_dot = np.zeros(3)
     for i in range(3):
-        for j in range(np.shape(pos)[0]):
-            dot = np.abs(np.dot(pos[j,:],ref_pa[:,i]))
+        for j in range(np.shape(ref_pos)[0]):
+            dot = np.abs(np.dot(ref_pos[j,:],ref_pa[:,i]))
             if dot > max_dot[i]:
                 max_dot[i] = dot
                 max_idx[i] = j
-
     for i in range(3):
         idx = int(max_idx[i])
         sign = np.sign(np.dot(pa[:,i], pos[idx,:]))
@@ -152,41 +161,60 @@ def get_referenced_principle_axis(AdTherm,ads):
         if sign != ref_sign:
             pa[:,i] *= -1
 
-    x = np.array([1,0,0])
-    y = np.array([0,1,0])
-    z = np.array([0,0,1])
+    x = np.array([1, 0, 0])
+    y = np.array([0, 1, 0])
+    z = np.array([0, 0, 1])
 
     if AdTherm.N_atoms_in_adsorbate == 2:
-        if np.dot(ref_pa[:,0],x) > 1e-4 and np.dot(pa[:,0],x) > 1e-4:
+        if np.abs(np.dot(ref_pa[:,0],x)) < 1e-1:
             ref_pa[:,1] = np.cross(ref_pa[:,0],x)
             pa[:,1] = np.cross(pa[:,0],x)
-        elif np.dot(ref_pa[:,0],x) > 1e-4 and np.dot(pa[:,0],y) > 1e-4:
+        elif np.abs(np.dot(ref_pa[:,0],y)) < 1e-1:
             ref_pa[:,1] = np.cross(ref_pa[:,0],y)
             pa[:,1] = np.cross(pa[:,0],y)
-        elif np.dot(ref_pa[:,0],x) > 1e-4 and np.dot(pa[:,0],z) > 1e-4:
+        elif np.abs(np.dot(ref_pa[:,0],z)) < 1e-1:
             ref_pa[:,1] = np.cross(ref_pa[:,0],z)
             pa[:,1] = np.cross(pa[:,0],z)
-        pa[:,1] =  (1 / LA.norm(pa[:,1])) * pa[:,1]
-    elif AdTherm.N_atoms_in_adsorbate == 3:
-        ref_pa[:,2] = np.cross(ref_pa[:,0],ref_pa[:,1])
-        pa[:,2] = np.cross(pa[:,0],pa[:,1])
+        else:
+            print('ERROR')
 
-    return np.matmul(ref_pa.T, pa)
+
+    ref_pa[:,2] = np.cross(ref_pa[:,0],ref_pa[:,1])
+    pa[:,2] = np.cross(pa[:,0],pa[:,1])
+
+    for i in range(3):
+        pa[:,i] =  (1 / LA.norm(pa[:,i])) * pa[:,i]
+        ref_pa[:,i] =  (1 / LA.norm(ref_pa[:,i])) * ref_pa[:,i]
+
+    return ref_pa, pa
 
 def map_rotation_to_min0(AdTherm, atoms):
     
     ads = atoms[AdTherm.indices].copy()
-    R = get_referenced_principle_axis(AdTherm,ads)
+    ref_pa, pa = get_referenced_principle_axis(AdTherm,ads)
+    R = np.matmul(ref_pa.T, pa)
+    if AdTherm.ndim == 6:
+        R = np.matmul(ref_pa.T, pa)
+    elif AdTherm.ndim == 5:
+        R = np.matmul(ref_pa.T, pa[:,0])
     A_solve = R.flatten()
 
     def f(x):
-        alpha, beta, gamma = x
-        R = get_R(alpha, beta, gamma)
+        if len(x) == 3:
+            alpha, beta, gamma = x
+        elif len(x) == 2:
+            alpha = 0
+            beta, gamma = x
+        if len(x) == 3:
+            R = get_R(alpha, beta, gamma)
+        elif len(x) == 2:
+            Rtmp = get_R(alpha, beta, gamma)
+            R = Rtmp[:,0]
         A = R.flatten()
         return A
 
     def system(x,b=A_solve):
-        return(f(x)-b)
+        return((f(x)-b))
 
     if AdTherm.ndim == 6:
         max_error = 10
@@ -205,12 +233,18 @@ def map_rotation_to_min0(AdTherm, atoms):
             max_error = np.max(np.abs(f(x.x) - A_solve))
 
     elif AdTherm.ndim == 5:
-        ''' maybe needs to be writen like the case above in the future'''
-        x=least_squares(system,
-                        np.asarray((0,0,0)),
-                        bounds=([-np.pi, -np.pi, -1e-8],
-                                [np.pi, np.pi, 1e-8]))
- 
+        max_error = 10
+        while max_error > 1e-12:
+            guess = np.random.rand(2)
+            guess[0] = guess[0] * np.pi - np.pi / 2
+            guess[1] = guess[1] * 2 * np.pi - np.pi
+            x=least_squares(system,
+                        guess,
+                        method = 'dogbox',
+                        bounds=([-np.pi/2, -np.pi],
+                                [np.pi/2, np.pi]),
+                        )
+            max_error = np.max(np.abs(f(x.x) - A_solve))
     rot_coord = x.x[0:AdTherm.ndim-3]
     return rot_coord
 

@@ -51,8 +51,8 @@ class AdTherm:
             self.minima_coords[i,0:3] = self.coms[i,:]
             self.minima_E[i] = minimum.calc.results['energy']
             if i != 0 and self.rotate:
-                self.minima_coords[i,3::] = map_rotation_to_min0(self, minimum)
-            h = project_to_rigid_hessian(self, self.hessians_3N[i], self.minima_coords[i,3::])
+                self.minima_coords[i,3:] = map_rotation_to_min0(self, minimum)
+            h = project_to_rigid_hessian(self, self.hessians_3N[i], self.minima_coords[i,:])
             self.rigid_hessians.append(h)
         self.E_ref = np.min(self.minima_E)
         return
@@ -127,7 +127,7 @@ class AdTherm:
                 rigid_coords = np.vstack((rigid_coords, new_coords))
         return dft_list, rigid_coords
 
-    def generate_sobol_points(self, n_sobol,min_number = 0):
+    def generate_sobol_points(self, n_sobol,min_number = 0, seed=1):
         n = n_sobol
         dft_list, rigid_coords = coord_generate(self, 'sobol', n, min_number)
         return dft_list, rigid_coords
