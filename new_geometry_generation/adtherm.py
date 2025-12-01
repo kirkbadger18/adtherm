@@ -91,7 +91,7 @@ class AdTherm:
         H_sym_3N = generate_symmetric_hessians(self,self.hessians_3N)
         H_sym_rigid = []
         for i in range(len(H_sym_3N)):
-            h = project_to_rigid_hessian(self, H_sym_3N[i], x_sym[i,3::])
+            h = project_to_rigid_hessian(self, H_sym_3N[i], x_sym[i,:])
             H_sym_rigid.append(h)
         self.symmetric_rigid_hessians = H_sym_rigid
         from ase.io import Trajectory
