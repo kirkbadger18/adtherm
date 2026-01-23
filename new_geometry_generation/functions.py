@@ -119,10 +119,9 @@ def bootstrap_points(AdTherm, atoms, coord,delta):
     force_all = atoms.calc.results['forces']
     force = force_all[AdTherm.indices].reshape(-1)
     E = atoms.calc.results['energy'] - AdTherm.E_ref
-    print(E)
     dx = delta
     rot_coords = coord[3::]
-    B = get_external_basis(AdTherm, rot_coords)
+    B = get_external_basis(AdTherm, coord)
     g_sub = -1 * np.matmul(np.transpose(B), force)
     dE = dx * g_sub
     x = np.zeros([2*AdTherm.ndim, AdTherm.ndim])
