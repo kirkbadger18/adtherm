@@ -130,9 +130,9 @@ class AdTherm:
                 rigid_coords = np.vstack((rigid_coords, new_coords))
         return dft_list, rigid_coords
 
-    def generate_sobol_points(self, n_sobol,min_number = 0, seed=1):
+    def generate_sobol_points(self, n_sobol, tsb=False, min_number = 0, seed=1):
         n = n_sobol
-        dft_list, rigid_coords = coord_generate(self, 'sobol', n, min_number)
+        dft_list, rigid_coords = coord_generate(self, 'sobol', n, tsb, min_number)
         return dft_list, rigid_coords
 
     def generate_random_points(self, n_random):

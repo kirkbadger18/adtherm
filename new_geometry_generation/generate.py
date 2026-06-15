@@ -2,7 +2,7 @@ import numpy as np
 from functions import * 
 from sobol_seq import i4_sobol_generate
 
-def coord_generate(AdTherm, method, N_values, minima_index=0, seed=1):
+def coord_generate(AdTherm, method, N_values, tsb=False, minima_index=0, seed=1):
     dft_jobs = []
     k = minima_index
     coords = np.zeros([N_values, AdTherm.ndim])
@@ -39,6 +39,9 @@ def coord_generate(AdTherm, method, N_values, minima_index=0, seed=1):
                 coord[3:AdTherm.ndim] *= 2 * np.pi
                 coord[3:AdTherm.ndim] -= np.pi
                 coord[4] *= 0.5
+
+        if tsb:
+            coord[4] = 0
 
         valid, xy_location = check_xy_coord(AdTherm, coord)
         if valid: # and location == 'inside':

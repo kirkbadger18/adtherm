@@ -217,7 +217,7 @@ def map_rotation_to_min0(AdTherm, atoms):
 
     if AdTherm.ndim == 6:
         max_error = 10
-        while max_error > 1e-12:
+        while max_error > 1e-6:
             guess = np.random.rand(3)
             guess[0] = guess[0] * 2 * np.pi - np.pi
             guess[1] = guess[1] * np.pi - np.pi / 2
@@ -229,6 +229,7 @@ def map_rotation_to_min0(AdTherm, atoms):
                                 [np.pi, np.pi/2, np.pi])                       
                         
                         )
+            #print(max_error)
             max_error = np.max(np.abs(f(x.x) - A_solve))
 
     elif AdTherm.ndim == 5:
