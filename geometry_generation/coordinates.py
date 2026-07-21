@@ -1,19 +1,38 @@
 from ase.atoms import Atoms
-from domain import RigidCoordDomain
+import numpy as np
+
+
+class AdsorbateReference:
+    def __init__(self,
+                 reference_atoms: Atoms,
+                 adsorbate_indices: list,
+                 ):
+        self.atoms = reference_atoms
+        self.ads_indices = adsorbate_indices
+        self.adsorbate = reference_atoms[adsorbate_indices].copy()
+        self._evaluate_reference()
+
+    def _evaluate_reference(self):
+        self.com = self.adsorbate.get_center_of_mass()
+        self.positions = self.adsorbate.positions - self.com
+        self.principle_axis = self.adsorbate.get_moments_of_inertia(vectors=True)
 
 
 class CoordinateConverter:
-
     def __init__(self,
-                 reference: Atoms,
-                 domain: RigidCoordDomain,
+                 reference: AdsorbateReference,
                  ):
-        pass
+        self.reference = reference
 
-    def to_rigid(self,
-                 cartcoords):
-        pass
+    def to_cartesian(self, rigid_coords):
+        cart_coord_list = []
+        for i, rigid_coord in enumerate(rigid_coords):
+            cart_coord = self.reference.positions.copy()
+            rot_mat = self.get_rotation_matrix()
+            cart_coord = np.matmul(rot_mat, cart_coord)
+            cart_coord += self.reference.com
+            cart_coord_list.append(cart_coord)
+        return cart_coord_list
 
-    def to_cartesian(self,
-                     rigidcoords):
+    def to_rigid(self, cartsian_coords):
         pass

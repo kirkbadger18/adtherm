@@ -2,6 +2,7 @@ from ase.atoms import Atoms
 from domain import RigidCoordDomain
 from sampler import SobolSampler
 from coordinates import CoordinateConverter
+from trajectory_factory import TrajectoryFactory
 import numpy as np
 
 
@@ -30,7 +31,9 @@ class Generator:
         self.coord_converter = CoordinateConverter(self.minima[0],
                                                    self.rigid_domain,
                                                    )
-    
+        self.traj_factory = TrajectoryFactory(self.minima[0],
+                                              self.adsorbate_indices)
+ 
     def generate_gaussian_samples(self,
                                   N: int,
                                   T: float,
