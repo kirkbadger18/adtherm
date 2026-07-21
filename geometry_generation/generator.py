@@ -1,4 +1,7 @@
 from ase.atoms import Atoms
+from domain import RigidCoordDomain
+from sampler import SobolSampler
+from coordinates import CoordinateConverter
 import numpy as np
 
 
@@ -23,7 +26,11 @@ class Generator:
         self.minima = minima
         self.Hessians_3N = hessians_3N
         self.adsorbate_indices = adsorbate_indices
-
+        self.rigid_domain = RigidCoordDomain(self.adsorbate_indices)
+        self.coord_converter = CoordinateConverter(self.minima[0],
+                                                   self.rigid_domain,
+                                                   )
+    
     def generate_gaussian_samples(self,
                                   N: int,
                                   T: float,
@@ -50,7 +57,11 @@ class Generator:
         to be fed to a calculator to be evaluated. The samples are generated
         using a Sobol sequence. N is the number of samples drawn.
         """
-        pass
+        sampler = SobolSampler(self.rigid_domain)
+        rigidcoords = sampler.draw_samples(N)
+        cartcoords = self.coord_converter.to_cartesian(rigidcoords)
+        trajectories = self.traj_factory.build_trajectories(cartcoords)
+        return trajectories
 
     def generate_random_samples(self,
                                 N: int,
