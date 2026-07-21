@@ -1,8 +1,8 @@
 from ase.atoms import Atoms
-from domain import RigidCoordDomain
-from sampler import SobolSampler
-from coordinates import CoordinateConverter
-from trajectory_factory import TrajectoryFactory
+from .domain import RigidCoordDomain
+from .sampler import SobolSampler
+from .coordinates import CoordinateConverter, AdsorbateReference
+from .trajectory_factory import TrajectoryFactory
 import numpy as np
 
 
@@ -28,12 +28,11 @@ class Generator:
         self.Hessians_3N = hessians_3N
         self.adsorbate_indices = adsorbate_indices
         self.rigid_domain = RigidCoordDomain(self.adsorbate_indices)
-        self.coord_converter = CoordinateConverter(self.minima[0],
-                                                   self.rigid_domain,
-                                                   )
-        self.traj_factory = TrajectoryFactory(self.minima[0],
-                                              self.adsorbate_indices)
- 
+        self.reference = AdsorbateReference(self.minima[0],
+                                            self.adsorbate_indices)
+        self.coord_converter = CoordinateConverter(self.reference)
+        self.traj_factory = TrajectoryFactory(self.reference)
+
     def generate_gaussian_samples(self,
                                   N: int,
                                   T: float,

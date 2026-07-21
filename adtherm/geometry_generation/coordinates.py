@@ -28,9 +28,9 @@ class CoordinateConverter:
         cart_coord_list = []
         for i, rigid_coord in enumerate(rigid_coords):
             cart_coord = self.reference.positions.copy()
-            rot_mat = self.get_rotation_matrix()
+            rot_mat = self.get_rotation_matrix(rigid_coords[2::])
             cart_coord = np.matmul(rot_mat, cart_coord)
-            cart_coord += self.reference.com
+            cart_coord += self.reference.com + rigid_coord[0:2]
             cart_coord_list.append(cart_coord)
         return cart_coord_list
 

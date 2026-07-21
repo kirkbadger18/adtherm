@@ -1,4 +1,4 @@
-from domain import RigidCoordDomain
+from .domain import RigidCoordDomain
 
 
 class BaseSampler:
