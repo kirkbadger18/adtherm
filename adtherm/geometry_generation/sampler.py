@@ -26,3 +26,13 @@ class SobolSampler(BaseSampler):
         upper_bounds = self.domain.upper_bounds()
         scaled_samples = qmc.scale(samples, lower_bounds, upper_bounds)
         return scaled_samples
+
+
+class GaussianSampler(BaseSampler):
+
+    def __init__(self, domain, rigid_minima):
+        super().__init__(domain)
+        self.rigid_minima = rigid_minima
+
+    def draw_samples(self, N, T):
+        pass

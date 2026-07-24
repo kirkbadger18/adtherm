@@ -40,3 +40,8 @@ class RigidCoordDomain:
         array = self.to_array()
         upper_bounds = array[:, 1]
         return upper_bounds
+
+    def is_inside(self):
+        """
+        check if inside domain, True is inside
+        """

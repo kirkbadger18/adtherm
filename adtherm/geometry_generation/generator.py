@@ -1,8 +1,9 @@
 from ase.atoms import Atoms
 from .domain import RigidCoordDomain
-from .sampler import SobolSampler
+from .sampler import SobolSampler, GaussianSampler
 from .coordinates import CoordinateConverter, AdsorbateReference
 from .trajectory_factory import TrajectoryFactory
+from .rigid_minima import RigidMinima
 import numpy as np
 
 
@@ -31,6 +32,10 @@ class Generator:
         self.reference = AdsorbateReference(self.minima[0],
                                             self.adsorbate_indices)
         self.coord_converter = CoordinateConverter(self.reference)
+        self.rigid_minima = RigidMinima(self.minima,
+                                        self.Hessians_3N,
+                                        self.coord_converter,
+                                        )
         self.traj_factory = TrajectoryFactory(self.reference)
 
     def generate_gaussian_samples(self,
@@ -49,7 +54,11 @@ class Generator:
         studied are anharmonic, one should sample well above and below their
         actual target temperature.
         """
-        pass
+        sampler = GaussianSampler(self.rigid_domain, self.rigid_minima)
+        rigidcoords = sampler.draw_samples(N, T)
+        cartcoords = self.coord_converter.to_cartesian(rigidcoords)
+        trajectories = self.traj_factory.build_trajectories(cartcoords)
+        return trajectories
 
     def generate_sobol_samples(self,
                                N: int,

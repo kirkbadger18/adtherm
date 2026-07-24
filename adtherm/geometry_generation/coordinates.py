@@ -25,13 +25,21 @@ class CoordinateConverter:
                  ):
         self.reference = reference
 
+    def _lattice_vecs_to_xy(self, v1, v2):
+        pass
+
+    def _xy_to_lattice_vecs(self, x, y):
+        pass
+
     def to_cartesian(self, rigid_coords):
         cart_coord_list = []
         for i, rigid_coord in enumerate(rigid_coords):
             cart_coord = self.reference.positions.copy()
             rot_mat = self.get_rotation_matrix(rigid_coords[2::])
             cart_coord = np.matmul(rot_mat, cart_coord)
-            cart_coord += self.reference.com + rigid_coord[0:2]
+            x, y = self._lattice_vecs_to_xy(rigid_coord[0], rigid_coord[1])
+            xyz = np.array([x, y, cart_coord[2]])
+            cart_coord[:, 2] += self.reference.com + xyz
             cart_coord_list.append(cart_coord)
         return cart_coord_list
 
