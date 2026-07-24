@@ -1,6 +1,7 @@
 from .domain import RigidCoordDomain
 from scipy.stats import qmc
 
+
 class BaseSampler:
 
     def __init__(self,
@@ -25,4 +26,3 @@ class SobolSampler(BaseSampler):
         upper_bounds = self.domain.upper_bounds()
         scaled_samples = qmc.scale(samples, lower_bounds, upper_bounds)
         return scaled_samples
-
