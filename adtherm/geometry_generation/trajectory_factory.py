@@ -1,4 +1,3 @@
-from ase.atoms import Atoms
 from .coordinates import AdsorbateReference
 
 

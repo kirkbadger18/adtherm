@@ -15,7 +15,8 @@ class AdsorbateReference:
     def _evaluate_reference(self):
         self.com = self.adsorbate.get_center_of_mass()
         self.positions = self.adsorbate.positions - self.com
-        self.principle_axis = self.adsorbate.get_moments_of_inertia(vectors=True)
+        pa = self.adsorbate.get_moments_of_inertia(vectors=True)
+        self.principle_axis = pa
 
 
 class CoordinateConverter:
