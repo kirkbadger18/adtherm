@@ -54,8 +54,8 @@ class Generator:
         studied are anharmonic, one should sample well above and below their
         actual target temperature.
         """
-        sampler = GaussianSampler(self.rigid_domain, self.rigid_minima)
-        rigidcoords = sampler.draw_samples(N, T)
+        sampler = GaussianSampler(self.rigid_domain, self.rigid_minima, T)
+        rigidcoords = sampler.draw_samples(N)
         cartcoords = self.coord_converter.to_cartesian(rigidcoords)
         trajectories = self.traj_factory.build_trajectories(cartcoords)
         return trajectories
@@ -82,7 +82,7 @@ class Generator:
         to be fed to a calculator to be evaluated. The samples are generated
         using a uniform random distribution. N is the number of samples drawn.
         """
-        pass
+        raise NotImplementedError
 
 
 class AutoGenerator(Generator):

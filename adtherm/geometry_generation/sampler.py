@@ -1,14 +1,19 @@
 from .domain import RigidCoordDomain
+from abc import ABC, abstractmethod
 from scipy.stats import qmc
 
 
-class BaseSampler:
+class BaseSampler(ABC):
 
     def __init__(self,
                  domain: RigidCoordDomain,
 
                  ):
         self.domain = domain
+
+    @abstractmethod
+    def draw_samples(self, N):
+        pass
 
 
 class SobolSampler(BaseSampler):
@@ -30,9 +35,10 @@ class SobolSampler(BaseSampler):
 
 class GaussianSampler(BaseSampler):
 
-    def __init__(self, domain, rigid_minima):
+    def __init__(self, domain, rigid_minima, T):
         super().__init__(domain)
         self.rigid_minima = rigid_minima
+        self.T = T
 
-    def draw_samples(self, N, T):
+    def draw_samples(self, N):
         pass
